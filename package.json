@@ -1,0 +1,31 @@
+{
+  "name": "vulcain.loadbalancer",
+  "version": "1.0.0",
+  "description": "Vulcain load balancer",
+  "main": "src/index.ts",
+  "scripts": {
+    "postinstall": "typings install"
+  },
+  "author": "Alain Metge",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^1.8.0",
+    "fs-extra": "^0.26.5",
+    "gulp": "^3.9.0",
+    "gulp-concat": "^2.6.0",
+    "gulp-sourcemaps": "^1.6.0",
+    "gulp-typescript": "^2.10.0",
+    "merge2": "^1.0.0",
+    "tslint": "3.3.0",
+    "gulp-tslint": "4.3.2",
+    "typings": "1.0.4",
+    "chai": "^3.5.0",
+    "sinon": "^1.17.4",
+    "gulp-istanbul": "^0.10.4",
+    "gulp-mocha": "^2.2.0"
+  },
+  "dependencies": {
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0"
+  }
+}
