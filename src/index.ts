@@ -19,23 +19,32 @@ const fs = require('fs');
 const express = require('express');
 const bodyParser = require('body-parser');
 import {Template} from './template';
-const app = express();
 import * as http from 'http'
 import {ProxyManager} from './proxyManager';
 
 let firstTime = true;
 const folder = "/var/haproxy";
 
+const app = express();
+app.use(bodyParser.json());
+app.use(express.static("/app/letsencrypt"));
+
 // -------------------------------------------------------------------
 // Reload configuration
 // -------------------------------------------------------------------
-app.post('/update', function (req, res) {
+app.post('/update', async function (req, res) {
     try {
         util.log("Updating configuration");
         let def = req.body;
-        let tpl = new Template(def);
-        tpl.transform();
-        res.end("OK");
+        if (def) {
+            let tpl = new Template(def);
+            await tpl.transform();
+            res.end("OK");
+        }
+        else {
+            util.log("Error: empty config");
+            res.status(400).end();
+        }
     }
     catch (e) {
         util.log(e);
@@ -50,6 +59,7 @@ app.post('/restart', function (req, res) {
     util.log("Restarting haproxy");
     let proxy = new ProxyManager();
     proxy.restart();
+    res.end();
 });
 
 function bootstrapAsync() {
@@ -63,6 +73,11 @@ function bootstrapAsync() {
         util.log("ERROR: VULCAIN_CLUSTER must be defined");
         process.exit(1);
     }
+    let token = process.env.VULCAIN_TOKEN;
+    if (!token) {
+        util.log("ERROR: You must provided a token.");
+        process.exit(1);
+    }
 
     util.log(`Getting proxy configuration for cluster ${cluster} on ${manager}`);
 
@@ -73,7 +88,7 @@ function bootstrapAsync() {
         host: parts[0],
         port: parts.length > 1 ? parseInt(parts[1]) : 80,
         headers: {
-            "Authorization": "ApiKey 0ebb6e00-4383-11e6-81ea-3fc910c9cb8e"
+            "Authorization": "ApiKey " + token
         }
     };
 
@@ -99,31 +114,49 @@ function bootstrapAsync() {
 // -------------------------------------------------------------------
 util.log("vulcain load balancer - version 1.0.0");
 
-bootstrapAsync().then((result: any) => {
-    let error = result.error;
-    if (!error) {
-        if (result.status / 100 > 2)
-            error = result.data;
-        else {
-            try {
-                let def = JSON.parse( result.data );
-                if (def.domain && def.services && def.backends) {
-                    let tpl = new Template(def);
-                    tpl.transform();
+app.listen(29000, (err) => {
+    if (err) {
+        console.log(err);
+        process.exit(1);
+        return;
+    }
+
+    util.log("Load balancer ready. Listening on port 29000");
+    let proxyManager = new ProxyManager();
+    proxyManager
+        .startProxy(true)
+        .then(() => {
+            setTimeout(initialize, 2000); // wait for haproxy running
+        })
+        .catch(err => {
+            console.log(err);
+            process.exit(1);
+        });
+});
+
+function initialize() {
+    bootstrapAsync().then((result: any) => {
+        let error = result.error;
+        if (!error) {
+            if (result.status / 100 > 2)
+                error = result.data;
+            else {
+                try {
+                    let def = JSON.parse(result.data);
+                    if (def.domain && def.services) {
+                        let tpl = new Template(def);
+                        tpl.transform();
+                    }
+                    else {
+                        util.log("No configurations founded.");
+                    }
                 }
-                else {
-                    util.log("No configurations founded.");
+                catch (e) {
+                    error = e;
                 }
-                app.use(express.static("/app/letsencrypt"));
-                app.use(bodyParser.urlencoded({ extended: true }));
-                app.use(bodyParser.json());
-                app.listen(29000, (err) => util.log("Load balancer ready. Listening on port 29000"));
-            }
-            catch (e) {
-                error = e;
             }
         }
-    }
-    if(error)
-        util.log("Error on bootstrap " + error);
-});
+        if (error)
+            util.log("Error on bootstrap " + error);
+    });
+}

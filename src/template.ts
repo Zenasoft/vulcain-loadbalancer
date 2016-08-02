@@ -36,7 +36,7 @@ export class Template
 
 // see https://github.com/tutumcloud/haproxy
 //     https://serversforhackers.com/load-balancing-with-haproxy
-    transform() {
+    async transform() {
 
         util.log("Generating new haproxy configuration file...");
 
@@ -47,11 +47,15 @@ export class Template
         let https = this.def.domain.split(':');
         let domain = https[0];
 
-    //    this.proxyManager.createCertificate(domain);
+        await this.proxyManager.createCertificate(domain, this.def.email);
 
         if (https.length === 1)
             https.push("443");
-        this.frontends.push(`  bind :${https[1]} ssl crt /etc/letsencrypt/live/${domain}/haproxy.pem`);
+        this.frontends.push(`  bind *:${https[1]} ssl crt /etc/letsencrypt/live/${domain}/haproxy.pem`);
+
+        //this.frontends.push("  bind *:80");
+        //this.frontends.push("  redirect scheme https if !{ ssl_fc }");
+        this.frontends.push("  mode http");
 
         for (let service of this.def.services) {
             this.emitFront(service);
@@ -75,31 +79,31 @@ export class Template
         this.proxyManager.restart();
     }
 
-    private emitBackends(service: ServiceDefinition)
-    {
-        let serviceName = this.def.clusterName + "_" + service.name.replace('.', '_') + "_" + service.port;
+    private emitBackends(service: ServiceDefinition) {
+        let serviceName = this.def.clusterName + "_" + service.name;
 
-            let backend = "backend_" + serviceName + "_" + service.version;
-            this.backends.push("");
-            this.backends.push("backend " + backend);
+        let backend = "backend_" + serviceName;
+        this.backends.push("");
+        this.backends.push("backend " + backend);
 
-            let publicPath = service.path;
-            if(publicPath[0] === '/')
-                publicPath = publicPath.substr(1);
-                this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
+        let publicPath = service.path;
+        if (publicPath[0] === '/')
+            publicPath = publicPath.substr(1);
 
-            this.def.backends.forEach(node =>
-            {
-                this.backends.push("  server server_" + node.hostname + "_" + service.port + " " + (node.hostname || node.ip) + ":" + service.port )
-            });
+        this.backends.push("  mode http");
+        this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
+        this.backends.push("  option forwardfor");
+        this.backends.push("  http-request set-header X-Forwarded-Port %[dst_port]");
+        this.backends.push("  http-request add-header X-Forwarded-Proto https if { ssl_fc }");
 
+        this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
     }
 
     private emitFront(service: ServiceDefinition) {
 
-        let serviceName = this.def.clusterName + "_" + service.name.replace('.', '_') + "_" + service.port;
+        let serviceName = this.def.clusterName + "_" + service.name;
 
-        let backend = "backend_" + serviceName + "_" + service.version;
+        let backend = "backend_" + serviceName;
         let publicPath = service.path;
         if (publicPath[0] === '/')
             publicPath = publicPath.substr(1);

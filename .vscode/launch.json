@@ -16,8 +16,9 @@
 				"--harmony"
 			],
 			"env": {
-				"VULCAIN_SERVER": "192.168.1.12:8080",
-				"VULCAIN_CLUSTER": "staging"
+				"VULCAIN_SERVER": "192.168.0.19:8080",
+				"VULCAIN_CLUSTER": "staging",
+				"VULCAIN_TOKEN": "02f772f0-54d4-11e6-8b6e-affc171e6d8b"
 			},
 			"externalConsole": false,
 			"sourceMaps": true,
