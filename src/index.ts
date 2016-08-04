@@ -52,6 +52,21 @@ app.post('/update', async function (req, res) {
     }
 });
 
+app.post('/updateDomains', async (req, res) => {
+    // Create or remove domains
+    let tenants = req.body;
+    let proxyManager = new ProxyManager();
+    try {
+        util.log("Updating domains");
+        // Remove unused
+        proxyManager.purge(tenants);
+    }
+    catch (e) {
+        util.log(e);
+        res.status(400).send(e);
+    }
+});
+
 // -------------------------------------------------------------------
 // Restart
 // -------------------------------------------------------------------
@@ -116,7 +131,7 @@ util.log("vulcain load balancer - version 1.0.0");
 
 app.listen(29000, (err) => {
     if (err) {
-        console.log(err);
+        util.log(err);
         process.exit(1);
         return;
     }
@@ -129,7 +144,7 @@ app.listen(29000, (err) => {
             setTimeout(initialize, 2000); // wait for haproxy running
         })
         .catch(err => {
-            console.log(err);
+            util.log(err);
             process.exit(1);
         });
 });
@@ -143,9 +158,10 @@ function initialize() {
             else {
                 try {
                     let def = JSON.parse(result.data);
-                    if (def.domain && def.services) {
+                    if (def.tenants && def.services) {
                         let tpl = new Template(def);
                         tpl.transform();
+                        tpl.proxyManager.purge(def.tenants);
                     }
                     else {
                         util.log("No configurations founded.");

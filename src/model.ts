@@ -5,14 +5,14 @@ export interface ServiceDefinition {
     port: number;
 }
 
-export interface BackendDefinition {
-    hostname: string;
-    ip: string;
+export interface TenantDefinition {
+    name: string;
+    domain: string;
 }
 
 export interface ServiceDefinitions {
     clusterName: string;
-    domain: string;
-    backends: Array<BackendDefinition>;
+    tenants: Array<TenantDefinition>;
+    email: string;
     services: Array<ServiceDefinition>;
 }

@@ -66,29 +66,29 @@ export class ProxyManager {
         //  -f /var/haproxy/haproxy.cfg ... : use a specific config file (works with share volume with service discover)
         if (firstTime) {
             util.log("Starting haproxy with haproxy.default");
-            return this.processCommand("haproxy -f /var/haproxy/haproxy.default -p /var/run/haproxy.pid");
+            return this.processCommand("haproxy -f /var/haproxy/haproxy.default -p /var/run/haproxy.pid", "Start haproxy");
         }
         else {
             // Soft restart
             // -sf : tells haproxy to send sigterm to all pid of the old haproxy process when the new process is ready
             const configFile = this.createConfigFileArguments();
             util.log("Restarting haproxy with " + configFile);
-            return this.processCommand("haproxy " + configFile + " -p /var/run/haproxy.pid -sf $(cat /var/run/haproxy.pid)");
+            return this.processCommand("haproxy " + configFile + " -p /var/run/haproxy.pid -sf $(cat /var/run/haproxy.pid)", "Restart haproxy");
         }
     }
 
     // -------------------------------------------------------------------
     // Function called when a process is started
     // -------------------------------------------------------------------
-    private processCommand(command: string) : Promise<any> {
+    private processCommand(command: string, message:string) : Promise<any> {
         return new Promise((resolve, reject) => {
             childProcess.exec(command, (error, stdout, stderr) => {
                 if (!error) {
-                    util.log("Haproxy restarted.");
+                    util.log("Success: " + message);
                     resolve(true);
                 }
                 else {
-                    util.log("***** Error ***** when starting haproxy")
+                    util.log("***** Error ***** " + message);
                     stdout && util.log(" stdout : " + stdout);
                     stderr && util.log(" stderr : " + stderr);
                     reject(error);
@@ -97,10 +97,30 @@ export class ProxyManager {
         });
     }
 
+    purge(domains: Array<any>) {
+        const certificatesFolder = "/etc/letsencrypt/live";
+
+        fs.readdir(certificatesFolder, (err, folders) => {
+            if (err) {
+                util.log("Error when trying to purge certificates " + err);
+                return;
+            }
+
+            domains = domains.map(d => d.domain.toLowerCase());
+
+            for (const folder of folders) {
+                if (domains.find(d => d === folder.toLowerCase()))
+                    continue;
+
+                this.processCommand("certbot revoke --cert-path " + certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain");
+            }
+        });
+    }
+
     createCertificate(domain: string, email:string) {
         return new Promise((resolve, reject) => {
             if (!fs.existsSync("/etc/letsencrypt/live/" + domain)) {
-                console.log("Creating certificate for " + domain);
+                util.log("Creating certificate for " + domain);
                 childProcess.execFile("/app/cert-creation.sh", [domain, email||"ametge@sovinty.com"], {cwd:"/app"}, (err, stdout, stderr) => {
                     if (err) {
                         util.log(`Error when creating certficate for ${domain} - ${err}`);

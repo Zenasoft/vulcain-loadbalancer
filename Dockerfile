@@ -11,7 +11,7 @@ EXPOSE 443
 EXPOSE 80
 
 # Persistent volume for certificates
-VOLUME /etc/letsencrypt/live
+VOLUME /etc/letsencrypt
 
 RUN mkdir -p /var/log/supervisor /app/letsencrypt/.well-known/acme-challenge
 

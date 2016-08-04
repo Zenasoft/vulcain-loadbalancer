@@ -15,7 +15,7 @@
 
 import * as fs from 'fs'
 import * as childProcess from 'child_process'
-import {ServiceDefinitions, BackendDefinition, ServiceDefinition} from './model';
+import {ServiceDefinitions, ServiceDefinition} from './model';
 const util = require('util');
 
 // Create template for haproxy and notify proxy container to restart if
@@ -28,7 +28,7 @@ export class Template
 {
     private backends: Array<string> = [];
     private frontends: Array<string> = [];
-    private proxyManager: ProxyManager;
+    public proxyManager: ProxyManager;
 
     constructor(private def: ServiceDefinitions) {
         this.proxyManager = new ProxyManager();
@@ -44,18 +44,27 @@ export class Template
             "frontend " + this.def.clusterName
         );
 
-        let https = this.def.domain.split(':');
-        let domain = https[0];
+        let crt = "";
+        for (const tenant of this.def.tenants) {
+            if (tenant) {
+                let domainName = tenant.domain
+                await this.proxyManager.createCertificate(domainName, this.def.email);
+                crt = crt + ` crt /etc/letsencrypt/live/${domainName}/haproxy.pem`;
+            }
+        }
 
-        await this.proxyManager.createCertificate(domain, this.def.email);
+        this.frontends.push(`  bind *:443 ssl ${crt}`);
 
-        if (https.length === 1)
-            https.push("443");
-        this.frontends.push(`  bind *:${https[1]} ssl crt /etc/letsencrypt/live/${domain}/haproxy.pem`);
-
-        //this.frontends.push("  bind *:80");
-        //this.frontends.push("  redirect scheme https if !{ ssl_fc }");
         this.frontends.push("  mode http");
+
+        for (const tenant of this.def.tenants) {
+            if (tenant) {
+                let domainName = tenant.domain
+                let acl = 'host_' + domainName.replace(/\./g, '');
+                this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
+                this.frontends.push("  http-request add-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
+            }
+        }
 
         for (let service of this.def.services) {
             this.emitFront(service);
@@ -86,15 +95,17 @@ export class Template
         this.backends.push("");
         this.backends.push("backend " + backend);
 
-        let publicPath = service.path;
-        if (publicPath[0] === '/')
-            publicPath = publicPath.substr(1);
-
-        this.backends.push("  mode http");
-        this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
         this.backends.push("  option forwardfor");
         this.backends.push("  http-request set-header X-Forwarded-Port %[dst_port]");
         this.backends.push("  http-request add-header X-Forwarded-Proto https if { ssl_fc }");
+
+        this.backends.push("  mode http");
+
+        let publicPath = service.path;
+        if (publicPath && publicPath[0] === '/')
+            publicPath = publicPath.substr(1);
+        if(publicPath)
+            this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
 
         this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
     }
@@ -105,11 +116,16 @@ export class Template
 
         let backend = "backend_" + serviceName;
         let publicPath = service.path;
-        if (publicPath[0] === '/')
-            publicPath = publicPath.substr(1);
+        if (publicPath) {
+            if (publicPath[0] === '/')
+                publicPath = publicPath.substr(1);
 
-        let acl = backend + "_public_acl";
-        this.frontends.push("  acl " + acl + " path_reg ^/" + publicPath + "[?\\#/]|^/" + publicPath + "$");
-        this.frontends.push("  use_backend " + backend + " if " + acl);
+            let acl = backend + "_public_acl";
+            this.frontends.push("  acl " + acl + " path_reg ^/" + publicPath + "[?\\#/]|^/" + publicPath + "$");
+            this.frontends.push("  use_backend " + backend + " if " + acl);
+        }
+        else {
+            this.frontends.push("  use_backend " + backend);
+        }
     }
 }
