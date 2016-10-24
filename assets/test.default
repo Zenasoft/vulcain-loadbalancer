@@ -1,0 +1,25 @@
+global
+    chroot /var/haproxy
+    daemon
+    #log 127.0.0.1 local1 info
+
+defaults
+  mode http
+  option http-server-close
+  log     global
+  option  dontlognull
+  retries 1
+  option redispatch
+  maxconn 300
+  timeout connect  4s
+  timeout client   10s
+  timeout server   30s
+  timeout http-keep-alive 4s
+  timeout http-request 10s
+
+frontend www-http
+  bind *:8080
+  default_backend www-backend
+
+backend www-backend
+  dispatch 127.0.0.1:80

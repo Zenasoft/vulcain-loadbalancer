@@ -18,9 +18,10 @@ const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const bodyParser = require('body-parser');
-import {Template} from './template';
+import { Template } from './template';
 import * as http from 'http'
-import {ProxyManager} from './proxyManager';
+import { ProxyManager } from './proxyManager';
+import { ServiceDefinitions } from './model';
 
 let firstTime = true;
 const folder = "/var/haproxy";
@@ -35,31 +36,22 @@ app.use(express.static("/app/letsencrypt"));
 app.post('/update', async function (req, res) {
     try {
         util.log("Updating configuration");
-        let def = req.body;
+        let def: ServiceDefinitions = req.body;
         if (def) {
             let tpl = new Template(def);
             await tpl.transform();
+
+            // Remove unused
+            util.log("Updating domains");
+            let proxyManager = new ProxyManager();
+            proxyManager.purge(def.tenants);
+
             res.end("OK");
         }
         else {
             util.log("Error: empty config");
             res.status(400).end();
         }
-    }
-    catch (e) {
-        util.log(e);
-        res.status(400).send(e);
-    }
-});
-
-app.post('/updateDomains', async (req, res) => {
-    // Create or remove domains
-    let tenants = req.body;
-    let proxyManager = new ProxyManager();
-    try {
-        util.log("Updating domains");
-        // Remove unused
-        proxyManager.purge(tenants);
     }
     catch (e) {
         util.log(e);
@@ -83,9 +75,9 @@ function bootstrapAsync() {
         util.log("ERROR: VULCAIN_SERVER must be defined");
         process.exit(1);
     }
-    let cluster = process.env.VULCAIN_CLUSTER;
+    let cluster = process.env.VULCAIN_ENV;
     if (!cluster) {
-        util.log("ERROR: VULCAIN_CLUSTER must be defined");
+        util.log("ERROR: VULCAIN_ENV must be defined");
         process.exit(1);
     }
     let token = process.env.VULCAIN_TOKEN;
@@ -99,7 +91,7 @@ function bootstrapAsync() {
     let parts = manager.split(':');
     let opts: http.RequestOptions = {
         method: "get",
-        path: "/api/v1/services/proxyConfiguration?env=" + cluster,
+        path: "/api/service.getproxyconfiguration?cluster=" + cluster,
         host: parts[0],
         port: parts.length > 1 ? parseInt(parts[1]) : 80,
         headers: {
@@ -127,7 +119,7 @@ function bootstrapAsync() {
 // -------------------------------------------------------------------
 // START
 // -------------------------------------------------------------------
-util.log("vulcain load balancer - version 1.0.0");
+util.log("vulcain load balancer - version 1.1.8");
 
 app.listen(29000, (err) => {
     if (err) {
@@ -157,14 +149,20 @@ function initialize() {
                 error = result.data;
             else {
                 try {
-                    let def = JSON.parse(result.data);
-                    if (def.tenants && def.services) {
-                        let tpl = new Template(def);
-                        tpl.transform();
-                        tpl.proxyManager.purge(def.tenants);
+                    let response = JSON.parse(result.data);
+                    if (response.error) {
+                        error = response.error.message;
                     }
                     else {
-                        util.log("No configurations founded.");
+                        let def = response.value;
+                        if (def.tenants && def.services) {
+                            let tpl = new Template(def);
+                            tpl.transform();
+                            tpl.proxyManager.purge(def.tenants);
+                        }
+                        else {
+                            util.log("No configurations founded.");
+                        }
                     }
                 }
                 catch (e) {

@@ -29,8 +29,10 @@ export class Template
     private backends: Array<string> = [];
     private frontends: Array<string> = [];
     public proxyManager: ProxyManager;
+    private testMode: boolean;
 
     constructor(private def: ServiceDefinitions) {
+        this.testMode = process.env.VULCAIN_MODE === "test";
         this.proxyManager = new ProxyManager();
     }
 
@@ -44,30 +46,14 @@ export class Template
             "frontend " + this.def.clusterName
         );
 
-        let crt = "";
-        for (const tenant of this.def.tenants) {
-            if (tenant) {
-                let domainName = tenant.domain
-                await this.proxyManager.createCertificate(domainName, this.def.email);
-                crt = crt + ` crt /etc/letsencrypt/live/${domainName}/haproxy.pem`;
-            }
-        }
+        this.backends.push("");
 
-        this.frontends.push(`  bind *:443 ssl ${crt}`);
-
-        this.frontends.push("  mode http");
-
-        for (const tenant of this.def.tenants) {
-            if (tenant) {
-                let domainName = tenant.domain
-                let acl = 'host_' + domainName.replace(/\./g, '');
-                this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
-                this.frontends.push("  http-request add-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
-            }
-        }
+        if (this.testMode)
+            await this.emitTestFront();
+        else
+            await this.emitFront();
 
         for (let service of this.def.services) {
-            this.emitFront(service);
             this.emitBackends(service);
         }
 
@@ -88,30 +74,50 @@ export class Template
         this.proxyManager.restart();
     }
 
-    private emitBackends(service: ServiceDefinition) {
-        let serviceName = this.def.clusterName + "_" + service.name;
+    private async emitFront() {
+        let crt = "";
+        for (const tenant of this.def.tenants) {
+            if (tenant) {
+                let domainName = tenant.domain
+                await this.proxyManager.createCertificate(domainName, this.def.email);
+                crt = crt + ` crt /etc/letsencrypt/live/${domainName}/haproxy.pem`;
+            }
+        }
 
-        let backend = "backend_" + serviceName;
-        this.backends.push("");
-        this.backends.push("backend " + backend);
+        this.frontends.push(`  bind *:443 ssl ${crt}`);
 
-        this.backends.push("  option forwardfor");
-        this.backends.push("  http-request set-header X-Forwarded-Port %[dst_port]");
-        this.backends.push("  http-request add-header X-Forwarded-Proto https if { ssl_fc }");
+        this.frontends.push("  mode http");
+        //this.frontends.push("  option httplog");
+        //this.frontends.push("  option dontlognull");
+        //this.frontends.push("  log global");
 
-        this.backends.push("  mode http");
-
-        let publicPath = service.path;
-        if (publicPath && publicPath[0] === '/')
-            publicPath = publicPath.substr(1);
-        if(publicPath)
-            this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
-
-        this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
+        for (const tenant of this.def.tenants) {
+            if (tenant) {
+                let domainName = tenant.domain
+                let acl = 'host_' + domainName.replace(/\./g, '');
+                this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
+                this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
+            }
+        }
     }
 
-    private emitFront(service: ServiceDefinition) {
+   private async emitTestFront() {
+        this.frontends.push(`  bind *:80`);
 
+        this.frontends.push("  mode http");
+
+        for (const tenant of this.def.tenants) {
+            if (tenant) {
+                let domainName = tenant.domain
+                let acl = 'host_' + domainName.replace(/\./g, '');
+                this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.domain);
+                this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
+                this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
+            }
+        }
+    }
+
+    private emitBackends(service: ServiceDefinition) {
         let serviceName = this.def.clusterName + "_" + service.name;
 
         let backend = "backend_" + serviceName;
@@ -127,5 +133,19 @@ export class Template
         else {
             this.frontends.push("  use_backend " + backend);
         }
+
+        this.backends.push("");
+        this.backends.push("backend " + backend);
+
+        this.backends.push("  option forwardfor");
+        this.backends.push("  http-request set-header X-Forwarded-Port %[dst_port]");
+        this.backends.push("  http-request add-header X-Forwarded-Proto https if { ssl_fc }");
+
+        this.backends.push("  mode http");
+
+        if(publicPath)
+            this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
+
+        this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
     }
 }

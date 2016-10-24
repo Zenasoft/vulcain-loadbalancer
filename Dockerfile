@@ -28,8 +28,11 @@ RUN chmod +x /app/cert-renewal.sh
 COPY assets/cert-creation.sh /app/cert-creation.sh
 RUN chmod +x /app/cert-creation.sh
 
-COPY assets/global.cfg /var/haproxy/haproxy.default
+COPY assets/global.default assets/test.default /var/haproxy/
 COPY node_modules/ /app/node_modules
 COPY dist/ /app
+
+#RUN apt-get update && apt-get install -y rsyslog
+#COPY assets/rsyslog.conf /etc/rsyslog.d/haproxy.conf
 
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
