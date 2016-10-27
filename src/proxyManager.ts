@@ -51,7 +51,7 @@ export class ProxyManager {
         try {
             var files = fs.readdirSync(folder);
             files.forEach(function (file:string, index) {
-                if (file.endsWith(".default"))
+                if (!file.endsWith(".cfg"))
                     return;
                 var fullPath = path.join(folder, file);
                 args.push("-f " + fullPath);
@@ -88,7 +88,9 @@ export class ProxyManager {
     // -------------------------------------------------------------------
     // Function called when a process is started
     // -------------------------------------------------------------------
-    private processCommand(command: string, message:string) : Promise<any> {
+    private processCommand(command: string, message: string): Promise<any> {
+        console.log("Running command " + command);
+        
         return new Promise((resolve, reject) => {
             childProcess.exec(command, (error, stdout, stderr) => {
                 if (!error) {
@@ -122,8 +124,12 @@ export class ProxyManager {
                 for (const folder of folders) {
                     if (domainNames.find(d => d === folder.toLowerCase()))
                         continue;
-
-                    this.processCommand("certbot revoke --cert-path " + certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain");
+                    try {
+                        this.processCommand("certbot revoke --cert-path " + certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain");
+                    }
+                    catch (e) {
+                        fs.unlink(certificatesFolder + "/" + folder);
+                    }
                 }
             });
         });

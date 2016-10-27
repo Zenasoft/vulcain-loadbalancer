@@ -23,7 +23,6 @@ import * as http from 'http'
 import { ProxyManager } from './proxyManager';
 import { ServiceDefinitions } from './model';
 
-let firstTime = true;
 const folder = "/var/haproxy";
 
 const app = express();
@@ -66,6 +65,13 @@ app.post('/restart', function (req, res) {
     util.log("Restarting haproxy");
     let proxy = new ProxyManager();
     proxy.restart();
+    res.end();
+});
+
+// -------------------------------------------------------------------
+// Health
+// -------------------------------------------------------------------
+app.post('/health', function (req, res) {
     res.end();
 });
 
@@ -119,7 +125,7 @@ function bootstrapAsync() {
 // -------------------------------------------------------------------
 // START
 // -------------------------------------------------------------------
-util.log("vulcain load balancer - version 1.1.8");
+util.log("vulcain load balancer - version 1.1.9");
 
 app.listen(29000, (err) => {
     if (err) {

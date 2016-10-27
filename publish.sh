@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
 
-docker build -t vulcain/load_balancer:latest .
-docker push vulcain/load_balancer:latest
+version=1.1.9
+docker build -t vulcain/load-balancer:$version .
+docker push vulcain/load-balancer:$version

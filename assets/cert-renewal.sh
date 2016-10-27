@@ -1,8 +1,9 @@
 #!/bin/sh
 
-rm /tmp/__renew > /dev/null 2>&1 || true
+echo "---- Running renew script $(date) ----"
 
 # renew and set a flag (as a file) if a renew has occured
+rm /tmp/__renew > /dev/null 2>&1 || true
 certbot renew --post-hook "touch /tmp/__renew"
 
 if [ -f /tmp/__renew ]; then
