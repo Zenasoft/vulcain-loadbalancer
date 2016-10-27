@@ -23,6 +23,7 @@ const util = require('util');
 // This code is not in the proxy container for updating. The current container can be
 //  stopped and updating while the proxy container is running.
 import {ProxyManager} from './proxyManager';
+import * as http from 'http';
 
 export class Template
 {
@@ -74,17 +75,29 @@ export class Template
         this.proxyManager.restart();
     }
 
+    /**
+     * Emit front definition with ssl certificats list for all tenants
+     * Bind on port 443
+     *
+     * @private
+     *
+     * @memberOf Template
+     */
     private async emitFront() {
-        let crt = "";
+        let crtList = [];
+        let crtFileName = "/var/haproxy/list.crt";
+
         for (const tenant of this.def.tenants) {
             if (tenant) {
                 let domainName = tenant.domain
                 await this.proxyManager.createCertificate(domainName, this.def.email);
-                crt = crt + ` crt /etc/letsencrypt/live/${domainName}/haproxy.pem`;
+                crtList.push( `/etc/letsencrypt/live/${domainName}/haproxy.pem`);
             }
         }
 
-        this.frontends.push(`  bind *:443 ssl ${crt}`);
+        fs.writeFileSync(crtFileName, crtList.join('\n'));
+
+        this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
 
         this.frontends.push("  mode http");
         //this.frontends.push("  option httplog");
@@ -110,7 +123,11 @@ export class Template
             if (tenant) {
                 let domainName = tenant.domain
                 let acl = 'host_' + domainName.replace(/\./g, '');
+                // http://(domain)/.....
+                this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
+                // http://test/api/...?$tenant=(domain)
                 this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.domain);
+                // http://test/api/...?$tenant=(tenant)
                 this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
                 this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
             }
@@ -145,6 +162,7 @@ export class Template
 
         if(publicPath)
             this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
+
 
         this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
     }
