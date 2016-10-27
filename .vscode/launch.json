@@ -16,11 +16,13 @@
 				"--harmony"
 			],
 			"env": {
+				"TEST": "true",
 				"VULCAIN_SERVER": "vulcain-ui",
 				"VULCAIN_ENV": "test-v1",
+				"VULCAIN_TEST": "false",
 				"VULCAIN_TOKEN": "02f772f0-54d4-11e6-8b6e-affc171e6d8b"
 			},
-			"externalConsole": false,
+			"console": "integratedTerminal",
 			"sourceMaps": true,
 			"outDir": "${workspaceRoot}/dist"
 		},
@@ -41,7 +43,7 @@
             "env": {
                 "NODE_ENV": "development"
             },
-            "externalConsole": false,
+			"console": "integratedTerminal",
             "sourceMaps": true,
             "outDir": "${workspaceRoot}/dist-test"
         },

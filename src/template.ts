@@ -13,6 +13,7 @@
 //    Copyright (c) Zenasoft
 //
 
+import * as Path from 'path';
 import * as fs from 'fs'
 import * as childProcess from 'child_process'
 import {ServiceDefinitions, ServiceDefinition} from './model';
@@ -27,14 +28,10 @@ import * as http from 'http';
 
 export class Template
 {
-    private backends: Array<string> = [];
-    private frontends: Array<string> = [];
-    public proxyManager: ProxyManager;
-    private testMode: boolean;
+    private backends: Array<string>;
+    private frontends: Array<string>;
 
-    constructor(private def: ServiceDefinitions) {
-        this.testMode = process.env.VULCAIN_MODE === "test";
-        this.proxyManager = new ProxyManager();
+    constructor(public proxyManager: ProxyManager, private def: ServiceDefinitions) {
     }
 
 // see https://github.com/tutumcloud/haproxy
@@ -43,13 +40,16 @@ export class Template
 
         util.log("Generating new haproxy configuration file...");
 
+        this.frontends = [];
+        this.backends = [];
+
         this.frontends.push(
             "frontend " + this.def.clusterName
         );
 
         this.backends.push("");
 
-        if (this.testMode)
+        if (this.proxyManager.engine.isTestServer())
             await this.emitTestFront();
         else
             await this.emitFront();
@@ -60,7 +60,7 @@ export class Template
 
         let newConfig = this.frontends.join('\n');
         newConfig += this.backends.join('\n');
-        let configFileName = "/var/haproxy/" + this.def.clusterName + ".cfg";
+        let configFileName = Path.join(this.proxyManager.engine.configurationsFolder, this.def.clusterName + ".cfg");
 
         //resolve(true);return;
         if (!newConfig) {
@@ -85,13 +85,13 @@ export class Template
      */
     private async emitFront() {
         let crtList = [];
-        let crtFileName = "/var/haproxy/list.crt";
+        let crtFileName = Path.join(this.proxyManager.engine.configurationsFolder, "list.crt");
 
         for (const tenant of this.def.tenants) {
             if (tenant) {
                 let domainName = tenant.domain
                 await this.proxyManager.createCertificate(domainName, this.def.email);
-                crtList.push( `/etc/letsencrypt/live/${domainName}/haproxy.pem`);
+                crtList.push( Path.join(this.proxyManager.engine.certificatesFolder, domainName, "haproxy.pem"));
             }
         }
 
