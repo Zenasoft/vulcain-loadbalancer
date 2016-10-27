@@ -1,4 +1,5 @@
 import { TenantDefinition } from './model';
+import { IEngine, EngineFactory } from './host';
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
 //   You may obtain a copy of the License at
@@ -15,16 +16,13 @@ import { TenantDefinition } from './model';
 //
 const childProcess = require('child_process');
 const util = require('util');
-const path = require('path');
 const fs = require('fs');
-const folder = '/var/haproxy';
+import * as Path from 'path';
 
 export class ProxyManager {
     private restarting = false;
-    private testMode: boolean;
 
-    constructor() {
-        this.testMode = process.env.VULCAIN_MODE === "test";
+    constructor( public engine: IEngine) {
     }
 
     // -------------------------------------------------------------------
@@ -46,14 +44,16 @@ export class ProxyManager {
     // combines all config file (one by cluster + default)
     // -------------------------------------------------------------------
     private createConfigFileArguments() {
-        const defaultName = this.testMode ? "test" : "global";
-        var args = ["-f " + folder + "/" + defaultName + ".default"];
+        const folder = this.engine.configurationsFolder;
+
+        const defaultName = this.engine.isTestServer() ? "test" : "global";
+        var args = ["-f " + Path.join(folder, defaultName + ".default")];
         try {
             var files = fs.readdirSync(folder);
             files.forEach(function (file:string, index) {
                 if (!file.endsWith(".cfg"))
                     return;
-                var fullPath = path.join(folder, file);
+                var fullPath = Path.join(folder, file);
                 args.push("-f " + fullPath);
             });
         }
@@ -75,45 +75,22 @@ export class ProxyManager {
         //  -f /var/haproxy/haproxy.cfg ... : use a specific config file (works with share volume with service discover)
         if (firstTime) {
             util.log("Starting haproxy with " + configFile);
-            return this.processCommand("haproxy " + configFile + " -p /var/run/haproxy.pid", "Start haproxy");
+            return this.engine.processCommandAsync("haproxy " + configFile + " -p /var/run/haproxy.pid", "Start haproxy");
         }
         else {
             // Soft restart
             // -sf : tells haproxy to send sigterm to all pid of the old haproxy process when the new process is ready
             util.log("Restarting haproxy with " + configFile);
-            return this.processCommand("haproxy " + configFile + " -p /var/run/haproxy.pid -sf $(cat /var/run/haproxy.pid)", "Restart haproxy");
+            return this.engine.processCommandAsync("haproxy " + configFile + " -p /var/run/haproxy.pid -sf $(cat /var/run/haproxy.pid)", "Restart haproxy");
         }
     }
 
-    // -------------------------------------------------------------------
-    // Function called when a process is started
-    // -------------------------------------------------------------------
-    private processCommand(command: string, message: string): Promise<any> {
-        console.log("Running command " + command);
-        
-        return new Promise((resolve, reject) => {
-            childProcess.exec(command, (error, stdout, stderr) => {
-                if (!error) {
-                    util.log("Success: " + message);
-                    resolve(true);
-                }
-                else {
-                    util.log("***** Error ***** " + message);
-                    stdout && util.log(" stdout : " + stdout);
-                    stderr && util.log(" stderr : " + stderr);
-                    reject(error);
-                }
-            });
-        });
-    }
-
     purge(domains: Array<TenantDefinition>) {
-        const certificatesFolder = "/etc/letsencrypt/live";
-        fs.exists(certificatesFolder, exists => {
+        fs.exists(this.engine.certificatesFolder, exists => {
             if (!exists)
                 return;
 
-            fs.readdir(certificatesFolder, (err, folders) => {
+            fs.readdir(this.engine.certificatesFolder, (err, folders) => {
                 if (err) {
                     util.log("Error when trying to purge certificates " + err);
                     return;
@@ -125,10 +102,10 @@ export class ProxyManager {
                     if (domainNames.find(d => d === folder.toLowerCase()))
                         continue;
                     try {
-                        this.processCommand("certbot revoke --cert-path " + certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain");
+                        this.engine.processCommandAsync("certbot revoke --cert-path " + this.engine.certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain");
                     }
                     catch (e) {
-                        fs.unlink(certificatesFolder + "/" + folder);
+                        fs.unlink(this.engine.certificatesFolder + "/" + folder);
                     }
                 }
             });
@@ -137,19 +114,12 @@ export class ProxyManager {
 
     createCertificate(domain: string, email: string) {
         return new Promise((resolve, reject) => {
-            fs.exists("/etc/letsencrypt/live/" + domain, exists => {
+            fs.exists(Path.join(this.engine.certificatesFolder, domain), exists => {
                 if (!exists) {
                     util.log("Creating certificate for " + domain);
-                    childProcess.execFile("/app/cert-creation.sh", [domain, email || "ametge@sovinty.com"], { cwd: "/app" }, (err, stdout, stderr) => {
-                        if (err) {
-                            util.log(`Error when creating certficate for ${domain} - ${err}`);
-                            reject(err);
-                        }
-                        else {
-                            util.log(`Certificate created for ${domain} - ${stdout}`);
-                            resolve();
-                        }
-                    });
+                    this.engine.createCertificateAsync(domain, email || "ametge@sovinty.com")
+                        .then(resolve)
+                        .catch(reject);
                 }
                 else
                     resolve();

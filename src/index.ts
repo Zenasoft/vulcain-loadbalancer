@@ -1,3 +1,5 @@
+import { Server } from './server';
+import { EngineFactory } from './host';
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
 //   You may obtain a copy of the License at
@@ -12,171 +14,13 @@
 //
 //    Copyright (c) Zenasoft
 //
-const childProcess = require('child_process');
 const util = require('util');
-const path = require('path');
-const fs = require('fs');
-const express = require('express');
-const bodyParser = require('body-parser');
-import { Template } from './template';
-import * as http from 'http'
-import { ProxyManager } from './proxyManager';
-import { ServiceDefinitions } from './model';
-
-const folder = "/var/haproxy";
-
-const app = express();
-app.use(bodyParser.json());
-app.use(express.static("/app/letsencrypt"));
-
-// -------------------------------------------------------------------
-// Reload configuration
-// -------------------------------------------------------------------
-app.post('/update', async function (req, res) {
-    try {
-        util.log("Updating configuration");
-        let def: ServiceDefinitions = req.body;
-        if (def) {
-            let tpl = new Template(def);
-            await tpl.transform();
-
-            // Remove unused
-            util.log("Updating domains");
-            let proxyManager = new ProxyManager();
-            proxyManager.purge(def.tenants);
-
-            res.end("OK");
-        }
-        else {
-            util.log("Error: empty config");
-            res.status(400).end();
-        }
-    }
-    catch (e) {
-        util.log(e);
-        res.status(400).send(e);
-    }
-});
-
-// -------------------------------------------------------------------
-// Restart
-// -------------------------------------------------------------------
-app.post('/restart', function (req, res) {
-    util.log("Restarting haproxy");
-    let proxy = new ProxyManager();
-    proxy.restart();
-    res.end();
-});
-
-// -------------------------------------------------------------------
-// Health
-// -------------------------------------------------------------------
-app.post('/health', function (req, res) {
-    res.end();
-});
-
-function bootstrapAsync() {
-    let manager = process.env.VULCAIN_SERVER;
-    if (!manager) {
-        util.log("ERROR: VULCAIN_SERVER must be defined");
-        process.exit(1);
-    }
-    let cluster = process.env.VULCAIN_ENV;
-    if (!cluster) {
-        util.log("ERROR: VULCAIN_ENV must be defined");
-        process.exit(1);
-    }
-    let token = process.env.VULCAIN_TOKEN;
-    if (!token) {
-        util.log("ERROR: You must provided a token.");
-        process.exit(1);
-    }
-
-    util.log(`Getting proxy configuration for cluster ${cluster} on ${manager}`);
-
-    let parts = manager.split(':');
-    let opts: http.RequestOptions = {
-        method: "get",
-        path: "/api/service.getproxyconfiguration?cluster=" + cluster,
-        host: parts[0],
-        port: parts.length > 1 ? parseInt(parts[1]) : 80,
-        headers: {
-            "Authorization": "ApiKey " + token
-        }
-    };
-
-    return new Promise((resolve, reject) => {
-        let req = http.request(opts, (res) => {
-            let data = '';
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-            res.on('end', () => {
-                resolve({ status: res && res.statusCode, data: data });
-            });
-        });
-        req.on('error', (e) => {
-            resolve({ error: e });
-        });
-        req.end();
-    });
-}
 
 // -------------------------------------------------------------------
 // START
 // -------------------------------------------------------------------
-util.log("vulcain load balancer - version 1.1.9");
+util.log("vulcain load balancer - version 1.1.10");
 
-app.listen(29000, (err) => {
-    if (err) {
-        util.log(err);
-        process.exit(1);
-        return;
-    }
-
-    util.log("Load balancer ready. Listening on port 29000");
-    let proxyManager = new ProxyManager();
-    proxyManager
-        .startProxy(true)
-        .then(() => {
-            setTimeout(initialize, 2000); // wait for haproxy running
-        })
-        .catch(err => {
-            util.log(err);
-            process.exit(1);
-        });
-});
-
-function initialize() {
-    bootstrapAsync().then((result: any) => {
-        let error = result.error;
-        if (!error) {
-            if (result.status / 100 > 2)
-                error = result.data;
-            else {
-                try {
-                    let response = JSON.parse(result.data);
-                    if (response.error) {
-                        error = response.error.message;
-                    }
-                    else {
-                        let def = response.value;
-                        if (def.tenants && def.services) {
-                            let tpl = new Template(def);
-                            tpl.transform();
-                            tpl.proxyManager.purge(def.tenants);
-                        }
-                        else {
-                            util.log("No configurations founded.");
-                        }
-                    }
-                }
-                catch (e) {
-                    error = e;
-                }
-            }
-        }
-        if (error)
-            util.log("Error on bootstrap " + error);
-    });
-}
+const engine = EngineFactory.createEngine();
+const server = new Server(engine)
+server.start();
