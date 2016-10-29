@@ -19,7 +19,7 @@ const util = require('util');
 // -------------------------------------------------------------------
 // START
 // -------------------------------------------------------------------
-util.log("vulcain load balancer - version 1.1.10");
+util.log("vulcain load balancer - version 1.1.11");
 
 const engine = EngineFactory.createEngine();
 const server = new Server(engine)

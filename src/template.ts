@@ -100,6 +100,8 @@ export class Template
         this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
 
         this.frontends.push("  mode http");
+        this.frontends.push("  http-request set-header X-VULCAIN-TENANT %[hdr(host),word(1,'.')]");
+
         //this.frontends.push("  option httplog");
         //this.frontends.push("  option dontlognull");
         //this.frontends.push("  log global");
@@ -123,10 +125,8 @@ export class Template
             if (tenant) {
                 let domainName = tenant.domain
                 let acl = 'host_' + domainName.replace(/\./g, '');
-                // http://(domain)/.....
                 this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
-                // http://test/api/...?$tenant=(domain)
-                this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.domain);
+
                 // http://test/api/...?$tenant=(tenant)
                 this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
                 this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
@@ -162,7 +162,8 @@ export class Template
 
         if(publicPath)
             this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
-
+        else if( service.path ) // means /
+            this.backends.push("  reqrep ^([^\\ :]*)\\ /(.*)   \\1\\ /api\\2");
 
         this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
     }

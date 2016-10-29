@@ -101,12 +101,11 @@ export class ProxyManager {
                 for (const folder of folders) {
                     if (domainNames.find(d => d === folder.toLowerCase()))
                         continue;
-                    try {
-                        this.engine.processCommandAsync("certbot revoke --cert-path " + this.engine.certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain");
-                    }
-                    catch (e) {
-                        fs.unlink(this.engine.certificatesFolder + "/" + folder);
-                    }
+
+                    this.engine.processCommandAsync("certbot revoke --cert-path " + this.engine.certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain")
+                        .catch(e => {
+                            fs.unlink(this.engine.certificatesFolder + "/" + folder);
+                        });
                 }
             });
         });
