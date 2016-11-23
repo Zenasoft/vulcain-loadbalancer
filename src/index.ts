@@ -22,5 +22,5 @@ const util = require('util');
 util.log("vulcain load balancer - version 1.1.11");
 
 const engine = EngineFactory.createEngine();
-const server = new Server(engine)
+const server = new Server(engine);
 server.start();

@@ -1,5 +1,3 @@
-import { TenantDefinition } from './model';
-import { IEngine, EngineFactory } from './host';
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
 //   You may obtain a copy of the License at
@@ -14,7 +12,8 @@ import { IEngine, EngineFactory } from './host';
 //
 //    Copyright (c) Zenasoft
 //
-const childProcess = require('child_process');
+import { TenantDefinition } from './model';
+import { IEngine } from './host';
 const util = require('util');
 const fs = require('fs');
 import * as Path from 'path';
@@ -22,7 +21,7 @@ import * as Path from 'path';
 export class ProxyManager {
     private restarting = false;
 
-    constructor( public engine: IEngine) {
+    constructor(public engine: IEngine) {
     }
 
     // -------------------------------------------------------------------
@@ -50,9 +49,10 @@ export class ProxyManager {
         var args = ["-f " + Path.join(folder, defaultName + ".default")];
         try {
             var files = fs.readdirSync(folder);
-            files.forEach(function (file:string, index) {
-                if (!file.endsWith(".cfg"))
+            files.forEach(function (file: string, index) {
+                if (!file.endsWith(".cfg")) {
                     return;
+                }
                 var fullPath = Path.join(folder, file);
                 args.push("-f " + fullPath);
             });
@@ -66,7 +66,7 @@ export class ProxyManager {
     // -------------------------------------------------------------------
     // Start or restart proxy
     // -------------------------------------------------------------------
-    public startProxy(firstTime:boolean) {
+    public startProxy(firstTime: boolean) {
 
         const configFile = this.createConfigFileArguments();
 
@@ -87,9 +87,9 @@ export class ProxyManager {
 
     purge(domains: Array<TenantDefinition>) {
         fs.exists(this.engine.certificatesFolder, exists => {
-            if (!exists)
+            if (!exists) {
                 return;
-
+            }
             fs.readdir(this.engine.certificatesFolder, (err, folders) => {
                 if (err) {
                     util.log("Error when trying to purge certificates " + err);
@@ -99,9 +99,9 @@ export class ProxyManager {
                 let domainNames = domains.map(d => d.domain.toLowerCase());
 
                 for (const folder of folders) {
-                    if (domainNames.find(d => d === folder.toLowerCase()))
+                    if (domainNames.find(d => d === folder.toLowerCase())) {
                         continue;
-
+                    }
                     this.engine.processCommandAsync("certbot revoke --cert-path " + this.engine.certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain")
                         .catch(e => {
                             fs.unlink(this.engine.certificatesFolder + "/" + folder);
@@ -120,8 +120,9 @@ export class ProxyManager {
                         .then(resolve)
                         .catch(reject);
                 }
-                else
+                else {
                     resolve();
+                }
             });
         });
     }

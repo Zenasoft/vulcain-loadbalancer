@@ -12,24 +12,21 @@
 //
 //    Copyright (c) Zenasoft
 //
-const childProcess = require('child_process');
 const util = require('util');
-const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const bodyParser = require('body-parser');
 import { Template } from './template';
-import * as http from 'http'
+import * as http from 'http';
 import { ProxyManager } from './proxyManager';
 import { ServiceDefinitions } from './model';
-import { EngineFactory, IEngine } from './host';
+import { IEngine } from './host';
 const app = express();
 
 export class Server {
 
     private proxyManager: ProxyManager;
 
-    constructor(engine:IEngine) {
+    constructor(engine: IEngine) {
         this.proxyManager = new ProxyManager(engine);
 
         app.use(bodyParser.json());
@@ -69,8 +66,9 @@ export class Server {
         this.bootstrapAsync().then((result: any) => {
             let error = result.error;
             if (!error) {
-                if (result.status / 100 > 2)
+                if (result.status / 100 > 2) {
                     error = result.data;
+                }
                 else {
                     try {
                         let response = JSON.parse(result.data);
@@ -94,8 +92,9 @@ export class Server {
                     }
                 }
             }
-            if (error)
+            if (error) {
                 util.log("Error on bootstrap " + error);
+            }
         });
     }
 

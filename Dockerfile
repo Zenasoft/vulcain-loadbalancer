@@ -1,4 +1,5 @@
-FROM haproxy:1.6
+#FROM haproxy:1.7
+FROM hub.sovinty.com/vulcain/haproxy:1.7
 
 RUN echo deb http://ftp.debian.org/debian jessie-backports main >> /etc/apt/sources.list && \
     apt-get update && apt-get -y install curl && \

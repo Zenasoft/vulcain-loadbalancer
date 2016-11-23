@@ -27,6 +27,7 @@ defaults
   timeout server   30s
   timeout http-keep-alive 4s
   timeout http-request 10s
+  default-server init-addr last,libc,none
 
 frontend www-http
   bind *:80

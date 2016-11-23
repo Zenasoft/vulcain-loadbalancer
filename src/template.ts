@@ -12,30 +12,26 @@
 //
 //    Copyright (c) Zenasoft
 //
-
 import * as Path from 'path';
-import * as fs from 'fs'
-import * as childProcess from 'child_process'
-import {ServiceDefinitions, ServiceDefinition} from './model';
+import * as fs from 'fs';
+import { ServiceDefinitions, ServiceDefinition } from './model';
 const util = require('util');
 
 // Create template for haproxy and notify proxy container to restart if
 //  new config is not equal than the previous one.
 // This code is not in the proxy container for updating. The current container can be
 //  stopped and updating while the proxy container is running.
-import {ProxyManager} from './proxyManager';
-import * as http from 'http';
+import { ProxyManager } from './proxyManager';
 
-export class Template
-{
+export class Template {
     private backends: Array<string>;
     private frontends: Array<string>;
 
     constructor(public proxyManager: ProxyManager, private def: ServiceDefinitions) {
     }
 
-// see https://github.com/tutumcloud/haproxy
-//     https://serversforhackers.com/load-balancing-with-haproxy
+    // see https://github.com/tutumcloud/haproxy
+    //     https://serversforhackers.com/load-balancing-with-haproxy
     async transform() {
 
         util.log("Generating new haproxy configuration file...");
@@ -49,11 +45,12 @@ export class Template
 
         this.backends.push("");
 
-        if (this.proxyManager.engine.isTestServer())
+        if (this.proxyManager.engine.isTestServer()) {
             await this.emitTestFront();
-        else
+        }
+        else {
             await this.emitFront();
-
+        }
         for (let service of this.def.services) {
             this.emitBackends(service);
         }
@@ -89,9 +86,9 @@ export class Template
 
         for (const tenant of this.def.tenants) {
             if (tenant) {
-                let domainName = tenant.domain
+                let domainName = tenant.domain;
                 await this.proxyManager.createCertificate(domainName, this.def.email);
-                crtList.push( Path.join(this.proxyManager.engine.certificatesFolder, domainName, "haproxy.pem"));
+                crtList.push(Path.join(this.proxyManager.engine.certificatesFolder, domainName, "haproxy.pem"));
             }
         }
 
@@ -108,7 +105,7 @@ export class Template
 
         for (const tenant of this.def.tenants) {
             if (tenant) {
-                let domainName = tenant.domain
+                let domainName = tenant.domain;
                 let acl = 'host_' + domainName.replace(/\./g, '');
                 this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
                 this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
@@ -116,14 +113,14 @@ export class Template
         }
     }
 
-   private async emitTestFront() {
+    private async emitTestFront() {
         this.frontends.push(`  bind *:80`);
 
         this.frontends.push("  mode http");
 
         for (const tenant of this.def.tenants) {
             if (tenant) {
-                let domainName = tenant.domain
+                let domainName = tenant.domain;
                 let acl = 'host_' + domainName.replace(/\./g, '');
                 this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
 
@@ -140,9 +137,9 @@ export class Template
         let backend = "backend_" + serviceName;
         let publicPath = service.path;
         if (publicPath) {
-            if (publicPath[0] === '/')
+            if (publicPath[0] === '/') {
                 publicPath = publicPath.substr(1);
-
+            }
             let acl = backend + "_public_acl";
             this.frontends.push("  acl " + acl + " path_reg ^/" + publicPath + "[?\\#/]|^/" + publicPath + "$");
             this.frontends.push("  use_backend " + backend + " if " + acl);
@@ -160,11 +157,14 @@ export class Template
 
         this.backends.push("  mode http");
 
-        if(publicPath)
+        if (publicPath) {
+            this.backends.push(`  http-request add-header X-VULCAIN-PUBLICPATH /${publicPath}`);
             this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
-        else if( service.path ) // means /
+        }
+        else if (service.path) { // means /
+            this.backends.push(`  http-request add-header X-VULCAIN-PUBLICPATH  /`);
             this.backends.push("  reqrep ^([^\\ :]*)\\ /(.*)   \\1\\ /api\\2");
-
+        }
         this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
     }
 }

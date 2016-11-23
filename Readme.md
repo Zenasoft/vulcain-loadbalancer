@@ -1,6 +1,7 @@
 # Vulcain load-balancer
 
 Public proxy for vulcain environnement based on haproxy with automatic letsencrypt certificat generation and renewal
+To use on vulcain platform.
 
 ## Installation
 
@@ -15,11 +16,10 @@ docker service create --name load-balancer -p 80:80 -p 443:443 -p 29000:29000 --
 
 * **VULCAIN_CLUSTER** : A valid environnement name in vulcain
 * **VULCAIN_TOKEN**   : A token with
-* **VULCAIN_CLUSTER** : A valid environnement name in vulcain
-
+* **VULCAIN_SERVER**  : Vulcain server address
 
 * Accept only https connection (request on port 80 are redirected)
-* port 29000 is used for management and can not be accessible from outside
+* port 29000 is used for management and must not be accessible from outside
 
 ## API
 
