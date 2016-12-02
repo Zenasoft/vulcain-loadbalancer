@@ -1,0 +1,12 @@
+FROM haproxy:1.7
+
+RUN apt-get update
+RUN apt-get install -y rsyslog
+RUN service rsyslog start
+COPY assets/rsyslog.conf /etc/rsyslog.d/491-haproxy.conf
+
+EXPOSE 9090
+
+VOLUME /usr/local/etc/haproxy/haproxy.cfg
+
+# service rsyslog start

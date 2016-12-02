@@ -22,6 +22,7 @@ const util = require('util');
 // This code is not in the proxy container for updating. The current container can be
 //  stopped and updating while the proxy container is running.
 import { ProxyManager } from './proxyManager';
+import * as shell from 'shelljs';
 
 export class Template {
     private backends: Array<string>;
@@ -43,7 +44,7 @@ export class Template {
             "frontend " + this.def.clusterName
         );
 
-        let newConfig: string;
+        let newConfig: string = "";
         this.backends.push("");
 
         let hasFrontends: boolean = true;
@@ -65,11 +66,8 @@ export class Template {
 
         let configFileName = Path.join(this.proxyManager.engine.configurationsFolder, this.def.clusterName + ".cfg");
 
-        if (hasFrontends && !newConfig) {
-            let exists = fs.exists(configFileName);
-            if (exists) {
-                fs.unlinkSync(configFileName);
-            }
+        if (!hasFrontends || !newConfig) {
+            shell.rm(configFileName);
         }
         else {
             fs.writeFileSync(configFileName, newConfig);
@@ -99,16 +97,17 @@ export class Template {
 
         fs.writeFileSync(crtFileName, crtList.join('\n'));
 
-        this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
         if (this.def.tenants.length === 0) {
             // No domain specified
             return false;
         }
 
+        this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
         this.frontends.push("  mode http");
         //this.frontends.push("  option httplog");
         //this.frontends.push("  option dontlognull");
         //this.frontends.push("  log global");
+
         if (this.def.tenantPattern) {
             this.frontends.push("  http-request set-header X-VULCAIN-TENANT pattern:" + this.def.tenantPattern);
         }

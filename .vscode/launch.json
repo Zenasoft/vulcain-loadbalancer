@@ -13,9 +13,9 @@
 			"cwd": "${workspaceRoot}",
 			"runtimeExecutable": null,
 			"runtimeArgs": [
-				"--harmony"
 			],
 			"env": {
+				"EXPIRATION_EMAIL" : "ametge@sovinty.com",
 				"TEST": "true",
 				"VULCAIN_SERVER": "vulcain-ui",
 				"VULCAIN_ENV": "test-v1",
