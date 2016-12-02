@@ -43,24 +43,29 @@ export class Template {
             "frontend " + this.def.clusterName
         );
 
+        let newConfig: string;
         this.backends.push("");
 
+        let hasFrontends: boolean = true;
         if (this.proxyManager.engine.isTestServer()) {
             await this.emitTestFront();
         }
         else {
-            await this.emitFront();
-        }
-        for (let service of this.def.services) {
-            this.emitBackends(service);
+            hasFrontends = await this.emitFront();
         }
 
-        let newConfig = this.frontends.join('\n');
-        newConfig += this.backends.join('\n');
+        if (hasFrontends) {
+            for (let service of this.def.services) {
+                this.emitBackends(service);
+            }
+
+            newConfig = this.frontends.join('\n');
+            newConfig += this.backends.join('\n');
+        }
+
         let configFileName = Path.join(this.proxyManager.engine.configurationsFolder, this.def.clusterName + ".cfg");
 
-        //resolve(true);return;
-        if (!newConfig) {
+        if (hasFrontends && !newConfig) {
             let exists = fs.exists(configFileName);
             if (exists) {
                 fs.unlinkSync(configFileName);
@@ -95,22 +100,30 @@ export class Template {
         fs.writeFileSync(crtFileName, crtList.join('\n'));
 
         this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
+        if (this.def.tenants.length === 0) {
+            // No domain specified
+            return false;
+        }
 
         this.frontends.push("  mode http");
-        this.frontends.push("  http-request set-header X-VULCAIN-TENANT %[hdr(host),word(1,'.')]");
-
         //this.frontends.push("  option httplog");
         //this.frontends.push("  option dontlognull");
         //this.frontends.push("  log global");
-
+        if (this.def.tenantPattern) {
+            this.frontends.push("  http-request set-header X-VULCAIN-TENANT pattern:" + this.def.tenantPattern);
+        }
+        else {
+            this.frontends.push("  http-request set-header X-VULCAIN-TENANT ?"); // must be resolved by the service
+        }
         for (const tenant of this.def.tenants) {
-            if (tenant) {
+            if (tenant && tenant.name) {
                 let domainName = tenant.domain;
                 let acl = 'host_' + domainName.replace(/\./g, '');
                 this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
                 this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
             }
         }
+        return true;
     }
 
     private async emitTestFront() {
@@ -119,7 +132,7 @@ export class Template {
         this.frontends.push("  mode http");
 
         for (const tenant of this.def.tenants) {
-            if (tenant) {
+            if (tenant && tenant.name) {
                 let domainName = tenant.domain;
                 let acl = 'host_' + domainName.replace(/\./g, '');
                 this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);

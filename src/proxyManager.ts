@@ -102,10 +102,7 @@ export class ProxyManager {
                     if (domainNames.find(d => d === folder.toLowerCase())) {
                         continue;
                     }
-                    this.engine.processCommandAsync("certbot revoke --cert-path " + this.engine.certificatesFolder + "/" + folder + "/haproxy.pem", "Revoke domain")
-                        .catch(e => {
-                            fs.unlink(this.engine.certificatesFolder + "/" + folder);
-                        });
+                    this.engine.revokeCertificate(this.engine.certificatesFolder, folder);
                 }
             });
         });
@@ -116,7 +113,7 @@ export class ProxyManager {
             fs.exists(Path.join(this.engine.certificatesFolder, domain), exists => {
                 if (!exists) {
                     util.log("Creating certificate for " + domain);
-                    this.engine.createCertificateAsync(domain, email || "ametge@sovinty.com")
+                    this.engine.createCertificateAsync(domain, email || process.env["EXPIRATION_EMAIL"])
                         .then(resolve)
                         .catch(reject);
                 }

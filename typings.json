@@ -19,7 +19,8 @@
     "rx.testing": "github:DefinitelyTyped/DefinitelyTyped/rx/rx.testing.d.ts#a5c07a6098b3b934380c13bb575d4ea5f3d73ffd",
     "rx.time": "github:DefinitelyTyped/DefinitelyTyped/rx/rx.time.d.ts#a5c07a6098b3b934380c13bb575d4ea5f3d73ffd",
     "rx.time-lite": "github:DefinitelyTyped/DefinitelyTyped/rx/rx.time-lite.d.ts#a5c07a6098b3b934380c13bb575d4ea5f3d73ffd",
-    "rx.virtualtime": "github:DefinitelyTyped/DefinitelyTyped/rx/rx.virtualtime.d.ts#a5c07a6098b3b934380c13bb575d4ea5f3d73ffd"
+    "rx.virtualtime": "github:DefinitelyTyped/DefinitelyTyped/rx/rx.virtualtime.d.ts#a5c07a6098b3b934380c13bb575d4ea5f3d73ffd",
+    "shelljs": "registry:dt/shelljs#0.0.0+20161003183410"
   },
   "globalDevDependencies": {
     "chai": "registry:dt/chai#3.4.0+20160317120654",
@@ -27,4 +28,3 @@
     "sinon": "registry:dt/sinon#1.16.0+20160517064723"
   }
 }
-

@@ -12,6 +12,7 @@ export interface TenantDefinition {
 
 export interface ServiceDefinitions {
     clusterName: string;
+    tenantPattern: string;
     tenants: Array<TenantDefinition>;
     email: string;
     services: Array<ServiceDefinition>;
