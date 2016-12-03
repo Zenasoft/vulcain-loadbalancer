@@ -112,10 +112,9 @@ export class ProxyManager {
         return new Promise((resolve, reject) => {
             fs.exists(Path.join(this.engine.certificatesFolder, domain), exists => {
                 if (!exists) {
-                    util.log("Creating certificate for " + domain);
                     this.engine.createCertificateAsync(domain, email || process.env["EXPIRATION_EMAIL"])
                         .then(resolve)
-                        .catch(reject);
+                        .catch(resolve);
                 }
                 else {
                     resolve();

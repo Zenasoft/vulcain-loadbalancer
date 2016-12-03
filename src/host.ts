@@ -143,8 +143,8 @@ class HostEngine implements IEngine {
             // TODO change default email
             childProcess.execFile("/app/cert-creation.sh", [domain, email || process.env["EXPIRATION_EMAIL"]], { cwd: "/app" }, (err, stdout, stderr) => {
                 if (err) {
-                    util.log(`Error when creating certficate for ${domain} - ${err}`);
-                    reject(err);
+                    util.log(`Error when creating certificate for ${domain} - ${err}`);
+                    resolve();
                 }
                 else {
                     util.log(`Certificate created for ${domain} - ${stdout}`);
