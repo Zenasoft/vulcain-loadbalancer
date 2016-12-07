@@ -114,7 +114,7 @@ export class ProxyManager {
                 if (!exists) {
                     this.engine.createCertificateAsync(domain, email || process.env["EXPIRATION_EMAIL"])
                         .then(resolve)
-                        .catch(resolve);
+                        .catch(reject);
                 }
                 else {
                     resolve();

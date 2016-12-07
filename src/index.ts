@@ -19,7 +19,7 @@ const util = require('util');
 // -------------------------------------------------------------------
 // START
 // -------------------------------------------------------------------
-util.log("vulcain load balancer - version 1.1.17");
+util.log("vulcain load balancer - version 1.1.20");
 
 if (!process.env["EXPIRATION_EMAIL"]) {
     console.log("Environment variable EXPIRATION_EMAIL is mandatory");

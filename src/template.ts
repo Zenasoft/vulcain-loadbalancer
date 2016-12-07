@@ -90,8 +90,13 @@ export class Template {
         for (const tenant of this.def.tenants) {
             if (tenant) {
                 let domainName = tenant.domain;
-                await this.proxyManager.createCertificate(domainName, this.def.email);
-                crtList.push(Path.join(this.proxyManager.engine.certificatesFolder, domainName, "haproxy.pem"));
+                try {
+                    await this.proxyManager.createCertificate(domainName, this.def.email);
+                    crtList.push(Path.join(this.proxyManager.engine.certificatesFolder, domainName, "haproxy.pem"));
+                }
+                catch (e) {
+                    util.log("Skipping " + domainName);
+                }
             }
         }
 

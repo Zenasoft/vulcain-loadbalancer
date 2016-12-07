@@ -76,8 +76,9 @@ class MockEngine implements IEngine {
     }
 
     createCertificateAsync(domain: string, email: string): Promise<any> {
-        util.log(`Create certificate for domain ${domain}`);
-        return Promise.resolve(true);
+        util.log(`Create certificate for domain ${domain}
+        --------------------------\n`);
+        return Promise.reject(true);
     }
 }
 
@@ -102,6 +103,7 @@ class HostEngine implements IEngine {
                     try {
                         util.log("Remove domain folder");
                         shell.rm("-rf", letsEncryptFolder + "/" + domain);
+                        shell.rm("-rf", letsEncryptFolder + "/../archive/" + domain);
                         util.log("Remove domain renewal configuration");
                         shell.rm(letsEncryptFolder + "/renewal/" + domain + ".conf");
                     }
@@ -140,14 +142,16 @@ class HostEngine implements IEngine {
     createCertificateAsync(domain: string, email: string): Promise<any> {
         util.log("Creating certificate for domain " + domain);
         return new Promise((resolve, reject) => {
-            // TODO change default email
+
             childProcess.execFile("/app/cert-creation.sh", [domain, email || process.env["EXPIRATION_EMAIL"]], { cwd: "/app" }, (err, stdout, stderr) => {
                 if (err) {
-                    util.log(`Error when creating certificate for ${domain} - ${err}`);
-                    resolve();
+                    util.log(`Error when creating certificate for ${domain} - ${err}
+                    -----------------------\n`);
+                    reject();
                 }
                 else {
-                    util.log(`Certificate created for ${domain} - ${stdout}`);
+                    util.log(`Certificate created for ${domain} ${stdout}
+                    ------------------------\n`);
                     resolve();
                 }
             });
