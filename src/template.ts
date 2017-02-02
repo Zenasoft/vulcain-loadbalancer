@@ -114,17 +114,17 @@ export class Template {
         //this.frontends.push("  log global");
 
         if (this.def.tenantPattern) {
-            this.frontends.push("  http-request set-header X-VULCAIN-TENANT pattern:" + this.def.tenantPattern);
+            this.frontends.push("  http-request set-header x-vulcain-tenant pattern:" + this.def.tenantPattern);
         }
         else {
-            this.frontends.push("  http-request set-header X-VULCAIN-TENANT ?"); // must be resolved by the service
+            this.frontends.push("  http-request set-header x-vulcain-tenant ?"); // must be resolved by the service
         }
         for (const tenant of this.def.tenants) {
             if (tenant && tenant.name) {
                 let domainName = tenant.domain;
                 let acl = 'host_' + domainName.replace(/\./g, '');
                 this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
-                this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
+                this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
             }
         }
         return true;
@@ -143,7 +143,7 @@ export class Template {
 
                 // http://test/api/...?$tenant=(tenant)
                 this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
-                this.frontends.push("  http-request set-header X-VULCAIN-TENANT " + tenant.name + " if " + acl);
+                this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
             }
         }
     }
@@ -154,11 +154,14 @@ export class Template {
         let backend = "backend_" + serviceName;
         let publicPath = service.path;
         if (publicPath) {
-            if (publicPath[0] === '/') {
-                publicPath = publicPath.substr(1);
+            if (publicPath === '/') {
+                publicPath = '';
+            }
+            else if (publicPath[0] !== '/') {
+                publicPath = '/' + publicPath;
             }
             let acl = backend + "_public_acl";
-            this.frontends.push("  acl " + acl + " path_reg ^/" + publicPath + "[?\\#/]|^/" + publicPath + "$");
+            this.frontends.push("  acl " + acl + " path_reg ^" + publicPath + "/?([?#].*)?$");
             this.frontends.push("  use_backend " + backend + " if " + acl);
         }
         else {
@@ -175,11 +178,11 @@ export class Template {
         this.backends.push("  mode http");
 
         if (publicPath) {
-            this.backends.push(`  http-request add-header X-VULCAIN-PUBLICPATH /${publicPath}`);
-            this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
+            this.backends.push(`  http-request add-header x-vulcain-publicpath ${publicPath}`);
+            this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath.substr(1) + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
         }
         else if (service.path) { // means /
-            this.backends.push(`  http-request add-header X-VULCAIN-PUBLICPATH  /`);
+            this.backends.push(`  http-request add-header x-vulcain-publicpath  /`);
             this.backends.push("  reqrep ^([^\\ :]*)\\ /(.*)   \\1\\ /api\\2");
         }
         this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
