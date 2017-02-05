@@ -24,9 +24,17 @@ const util = require('util');
 import { ProxyManager } from './proxyManager';
 import * as shell from 'shelljs';
 
+/**
+ *  Haproxy configuration generator from template
+ */
 export class Template {
     private backends: Array<string>;
     private frontends: Array<string>;
+
+    get configFileName() {
+        let configFileName = Path.join(this.proxyManager.engine.configurationsFolder, this.def.clusterName + ".cfg");
+        return configFileName;
+    }
 
     constructor(public proxyManager: ProxyManager, private def: ServiceDefinitions) {
     }
@@ -64,15 +72,21 @@ export class Template {
             newConfig += this.backends.join('\n');
         }
 
-        let configFileName = Path.join(this.proxyManager.engine.configurationsFolder, this.def.clusterName + ".cfg");
-
         if (!hasFrontends || !newConfig) {
-            shell.rm(configFileName);
+            shell.rm(this.configFileName);
         }
         else {
-            fs.writeFileSync(configFileName, newConfig);
+            fs.writeFileSync(this.configFileName, newConfig);
         }
         this.proxyManager.restart();
+    }
+
+    getCurrentHaproxyConfiguration() {
+        let fn = this.configFileName;
+        if (fs.existsSync(fn)) {
+            return fs.readFileSync(fn, 'utf8');
+        }
+        return "";
     }
 
     /**
@@ -113,6 +127,11 @@ export class Template {
         //this.frontends.push("  option dontlognull");
         //this.frontends.push("  log global");
 
+        this.emitTenantRules();
+        return true;
+    }
+
+    private emitTenantRules() {
         if (this.def.tenantPattern) {
             this.frontends.push("  http-request set-header x-vulcain-tenant pattern:" + this.def.tenantPattern);
         }
@@ -125,27 +144,27 @@ export class Template {
                 let acl = 'host_' + domainName.replace(/\./g, '');
                 this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
                 this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
+
+                if (this.proxyManager.engine.isTestServer()) {
+                    // http://test/api/...?$tenant=(tenant)
+                    this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
+                    this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
+                }
             }
         }
-        return true;
     }
 
     private async emitTestFront() {
-        this.frontends.push(`  bind *:80`);
 
+        if (this.def.tenants.length === 0) {
+            // No domain specified
+            return false;
+        }
+
+        this.frontends.push(`  bind *:80`);
         this.frontends.push("  mode http");
 
-        for (const tenant of this.def.tenants) {
-            if (tenant && tenant.name) {
-                let domainName = tenant.domain;
-                let acl = 'host_' + domainName.replace(/\./g, '');
-                this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
-
-                // http://test/api/...?$tenant=(tenant)
-                this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
-                this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
-            }
-        }
+        this.emitTenantRules();
     }
 
     private emitBackends(service: ServiceDefinition) {

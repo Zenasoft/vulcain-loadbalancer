@@ -2,6 +2,9 @@ const util = require('util');
 import * as childProcess from 'child_process';
 import * as shell from 'shelljs';
 
+/**
+ * Host interaction
+ */
 export interface IEngine {
     /**
      * Folder for storing letsencrypt's certificates
@@ -88,7 +91,7 @@ class HostEngine implements IEngine {
     public configurationsFolder = "/var/haproxy";
 
     isTestServer() {
-        return process.env.VULCAIN_TEST === "true";
+        return process.env.VULCAIN_ENV_MODE === "test";
     }
 
     revokeCertificate(letsEncryptFolder: string, domain: string) {
@@ -105,7 +108,7 @@ class HostEngine implements IEngine {
                         shell.rm("-rf", letsEncryptFolder + "/" + domain);
                         shell.rm("-rf", letsEncryptFolder + "/../archive/" + domain);
                         util.log("Remove domain renewal configuration");
-                        shell.rm(letsEncryptFolder + "/renewal/" + domain + ".conf");
+                        shell.rm(letsEncryptFolder + "/../renewal/" + domain + ".conf");
                     }
                     catch (e) {
                         util.log(`Certificat revocation failed for domain ${domain}`);

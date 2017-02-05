@@ -13,7 +13,7 @@
 //    Copyright (c) Zenasoft
 //
 const util = require('util');
-const express = require('express');
+import * as express from 'express';
 const bodyParser = require('body-parser');
 import { Template } from './template';
 import * as http from 'http';
@@ -32,9 +32,10 @@ export class Server {
         app.use(bodyParser.json());
         app.use(express.static("/app/letsencrypt"));
 
-        app.post('/update', (req, res) => this.updateConfiguration(req, res));
-        app.post('/restart', (req, res) => this.restart(req, res));
-        app.get('/health', function (req, res) { res.end(); });
+        app.post('/update', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res));
+        app.post('/restart', (req: express.Request, res: express.Response) => this.restart(req, res));
+        app.get('/health', (req: express.Request, res: express.Response) => { res.end(); });
+        app.get('/infos', (req: express.Request, res: express.Response) => { this.showInfos( req.query.env, res); });
     }
 
     start() {
@@ -48,12 +49,12 @@ export class Server {
 
             util.log("Load balancer ready. Listening on port 29000");
 
-            // When server is initialized, run haproxy with a initial configuration
+            // When server is initialized, run haproxy with initial configuration
             //
             this.proxyManager
                 .startProxy(true)
                 .then(() => {
-                    setTimeout(this.initialize.bind(this), 2000); // wait for haproxy running
+                    setTimeout(this.initialize.bind(this), 2000); // waiting for haproxy running
                 })
                 .catch(err => {
                     util.log(err);
@@ -101,7 +102,7 @@ export class Server {
     // -------------------------------------------------------------------
     // Reload configuration
     // -------------------------------------------------------------------
-    private async updateConfiguration(req, res) {
+    private async updateConfiguration(req: express.Request, res: express.Response) {
         try {
             util.log("Updating configuration");
             let def: ServiceDefinitions = req.body;
@@ -129,7 +130,7 @@ export class Server {
     // -------------------------------------------------------------------
     // Restart
     // -------------------------------------------------------------------
-    private restart(req, res) {
+    private restart(req: express.Request, res: express.Response) {
         util.log("Restarting haproxy");
         this.proxyManager.restart();
         res.end();
@@ -159,7 +160,7 @@ export class Server {
             process.exit(1);
         }
 
-        util.log(`Getting proxy configuration for cluster ${cluster} on ${manager}`);
+        util.log(`Getting proxy configuration for environment ${cluster} on ${manager}`);
 
         // Getting information from vulcain server for initialize config
         let parts = manager.split(':');
@@ -188,5 +189,17 @@ export class Server {
             });
             req.end();
         });
+    }
+
+    private showInfos(env: string, res: express.Response) {
+        if (!env)
+        {
+            res.status(400).end();
+            return;
+        }
+
+        let tpl = new Template(this.proxyManager, <any>{ clusterName: env });
+        let cfg = tpl.getCurrentHaproxyConfiguration();
+        res.send({ config: cfg }); // TODO log
     }
 }

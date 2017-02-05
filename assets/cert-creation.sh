@@ -5,7 +5,7 @@ domain=$1
 email=$2
 
 staging=""
-if [ "$VULCAIN_ENV_MODE" == "test" ]; then
+if [ "$VULCAIN_ENV_MODE" == "test" -o -n "$STAGING"]; then
     staging="--staging"
 fi
 

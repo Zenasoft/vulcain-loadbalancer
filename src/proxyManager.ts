@@ -18,6 +18,9 @@ const util = require('util');
 const fs = require('fs');
 import * as Path from 'path';
 
+/**
+ *
+ */
 export class ProxyManager {
     private restarting = false;
 
@@ -25,7 +28,7 @@ export class ProxyManager {
     }
 
     // -------------------------------------------------------------------
-    // Define web api used to restart haproxy
+    // Restart proxy
     // -------------------------------------------------------------------
     restart() {
         // Simulate rx.debounce
@@ -33,8 +36,9 @@ export class ProxyManager {
         if (!this.restarting) {
             this.restarting = true;
             setTimeout(function () {
-                self.startProxy(false);
-                self.restarting = false;
+                self.startProxy(false)
+                    .then(() => { self.restarting = false; })
+                    .catch(e => { self.restarting = false; });
             }, 2000);
         }
     }
