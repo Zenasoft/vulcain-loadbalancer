@@ -15,12 +15,12 @@
 			"runtimeArgs": [
 			],
 			"env": {
-				"EXPIRATION_EMAIL" : "ametge@sovinty.com",
+				"EXPIRATION_EMAIL" : "dummy@mail.com",
 				"TEST": "true",
-				"VULCAIN_SERVER": "vulcain-ui",
+				"VULCAIN_SERVER": "demo",
 				"VULCAIN_ENV": "test-v1",
 				"VULCAIN_TEST": "false",
-				"VULCAIN_TOKEN": "02f772f0-54d4-11e6-8b6e-affc171e6d8b"
+				"VULCAIN_TOKEN": "ab690d50-e85d-11e6-b767-8f41c48a4483"
 			},
 			"console": "integratedTerminal",
 			"sourceMaps": true,

@@ -156,13 +156,13 @@ export class Template {
 
     private async emitTestFront() {
 
+        this.frontends.push(`  bind *:80`);
+        this.frontends.push("  mode http");
+
         if (this.def.tenants.length === 0) {
             // No domain specified
             return false;
         }
-
-        this.frontends.push(`  bind *:80`);
-        this.frontends.push("  mode http");
 
         this.emitTenantRules();
     }
@@ -180,7 +180,7 @@ export class Template {
                 publicPath = '/' + publicPath;
             }
             let acl = backend + "_public_acl";
-            this.frontends.push("  acl " + acl + " path_reg ^" + publicPath + "/?([?#].*)?$");
+            this.frontends.push("  acl " + acl + " path_reg ^" + publicPath + "/?([?\\#/].*)?$");
             this.frontends.push("  use_backend " + backend + " if " + acl);
         }
         else {
@@ -198,7 +198,7 @@ export class Template {
 
         if (publicPath) {
             this.backends.push(`  http-request add-header x-vulcain-publicpath ${publicPath}`);
-            this.backends.push("  reqrep ^([^\\ :]*)\\ /(" + publicPath.substr(1) + ")([?\\#/]+)(.*)   \\1\\ /api\\3\\4");
+            this.backends.push("  reqrep ^([^\\ :]*)\\ " + publicPath + "(/?([?\\#/].*))?$   \\1\\ /api\\2");
         }
         else if (service.path) { // means /
             this.backends.push(`  http-request add-header x-vulcain-publicpath  /`);

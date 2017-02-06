@@ -17,4 +17,10 @@ defaults
   timeout http-keep-alive 4s
   timeout http-request 10s
   default-server init-addr last,libc,none
-  
+
+  frontend www-http
+  bind *:8080
+  default_backend www-backend
+
+backend www-backend
+  dispatch 127.0.0.1:80
