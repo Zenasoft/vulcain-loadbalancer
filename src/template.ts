@@ -198,7 +198,7 @@ export class Template {
 
         if (publicPath) {
             this.backends.push(`  http-request add-header x-vulcain-publicpath ${publicPath}`);
-            this.backends.push("  reqrep ^([^\\ :]*)\\ " + publicPath + "(/?([?\\#/].*))?$   \\1\\ /api\\2");
+            this.backends.push("  reqrep ^([^\\ ]*)\\ " + publicPath + "([?\\#/].*)?   \\1\\ /api\\2");
         }
         else if (service.path) { // means /
             this.backends.push(`  http-request add-header x-vulcain-publicpath  /`);
