@@ -116,11 +116,6 @@ export class Template {
 
         fs.writeFileSync(crtFileName, crtList.join('\n'));
 
-        if (this.def.tenants.length === 0) {
-            // No domain specified
-            return false;
-        }
-
         this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
         this.frontends.push("  mode http");
         //this.frontends.push("  option httplog");
@@ -138,17 +133,19 @@ export class Template {
         else {
             this.frontends.push("  http-request set-header x-vulcain-tenant ?"); // must be resolved by the service
         }
-        for (const tenant of this.def.tenants) {
-            if (tenant && tenant.name) {
-                let domainName = tenant.domain;
-                let acl = 'host_' + domainName.replace(/\./g, '');
-                this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
-                this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
-
-                if (this.proxyManager.engine.isTestServer()) {
-                    // http://test/api/...?$tenant=(tenant)
-                    this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
+        if (this.def.tenants) {
+            for (const tenant of this.def.tenants) {
+                if (tenant && tenant.name) {
+                    let domainName = tenant.domain;
+                    let acl = 'host_' + domainName.replace(/\./g, '');
+                    this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
                     this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
+
+                    if (this.proxyManager.engine.isTestServer()) {
+                        // http://test/api/...?$tenant=(tenant)
+                        this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
+                        this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
+                    }
                 }
             }
         }
@@ -158,11 +155,6 @@ export class Template {
 
         this.frontends.push(`  bind *:80`);
         this.frontends.push("  mode http");
-
-        if (this.def.tenants.length === 0) {
-            // No domain specified
-            return false;
-        }
 
         this.emitTenantRules();
     }
