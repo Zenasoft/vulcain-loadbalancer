@@ -118,33 +118,33 @@ export class Template {
 
         this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
         this.frontends.push("  mode http");
+        this.frontends.push("  reqidel ^x-vulcain");
         //this.frontends.push("  option httplog");
         //this.frontends.push("  option dontlognull");
         //this.frontends.push("  log global");
 
-        this.emitTenantRules();
         return true;
     }
 
     private emitTenantRules() {
         if (this.def.tenantPattern) {
-            this.frontends.push("  http-request set-header x-vulcain-tenant pattern:" + this.def.tenantPattern);
+            this.backends.push("  http-request set-header x-vulcain-tenant pattern:" + this.def.tenantPattern);
         }
         else {
-            this.frontends.push("  http-request set-header x-vulcain-tenant ?"); // must be resolved by the service
+            this.backends.push("  http-request set-header x-vulcain-tenant ?"); // must be resolved by the service
         }
         if (this.def.tenants) {
             for (const tenant of this.def.tenants) {
                 if (tenant && tenant.name) {
                     let domainName = tenant.domain;
                     let acl = 'host_' + domainName.replace(/\./g, '');
-                    this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
-                    this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
+                    this.backends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
+                    this.backends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
 
                     if (this.proxyManager.engine.isTestServer()) {
                         // http://test/api/...?$tenant=(tenant)
-                        this.frontends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
-                        this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
+                        this.backends.push("  acl " + acl + " url_param($tenant) -i " + tenant.name);
+                        this.backends.push("  http-request set-header x-vulcain-tenant " + tenant.name + " if " + acl);
                     }
                 }
             }
@@ -152,11 +152,8 @@ export class Template {
     }
 
     private async emitTestFront() {
-
         this.frontends.push(`  bind *:80`);
         this.frontends.push("  mode http");
-
-        this.emitTenantRules();
     }
 
     private emitBackends(service: ServiceDefinition) {
@@ -187,6 +184,8 @@ export class Template {
         this.backends.push("  http-request add-header X-Forwarded-Proto https if { ssl_fc }");
 
         this.backends.push("  mode http");
+
+        this.emitTenantRules();
 
         if (publicPath) {
             this.backends.push(`  http-request add-header x-vulcain-publicpath ${publicPath}`);
