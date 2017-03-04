@@ -100,6 +100,7 @@ export class Template {
     private async emitFront() {
         let crtList = [];
         let crtFileName = Path.join(this.proxyManager.engine.configurationsFolder, "list.crt");
+        let hasFrontEnds = false;
 
         for (const tenant of this.def.tenants) {
             if (tenant) {
@@ -107,6 +108,7 @@ export class Template {
                 try {
                     await this.proxyManager.createCertificate(domainName, this.def.email);
                     crtList.push(Path.join(this.proxyManager.engine.certificatesFolder, domainName, "haproxy.pem"));
+                    hasFrontEnds = true;
                 }
                 catch (e) {
                     util.log("Skipping " + domainName);
@@ -123,7 +125,7 @@ export class Template {
         //this.frontends.push("  option dontlognull");
         //this.frontends.push("  log global");
 
-        return true;
+        return hasFrontEnds;
     }
 
     private emitTenantRules() {
