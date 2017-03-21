@@ -25,6 +25,11 @@ if (!process.env["EXPIRATION_EMAIL"]) {
     console.log("Environment variable EXPIRATION_EMAIL is mandatory");
     process.exit(1);
 }
+if (!process.env.VULCAIN_ENV) {
+    util.log("Environment variable VULCAIN_ENV must be defined");
+    process.exit(1);
+}
+
 const engine = EngineFactory.createEngine();
 const server = new Server(engine);
 server.start();

@@ -35,7 +35,7 @@ export class Server {
         app.post('/update', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res));
         app.post('/restart', (req: express.Request, res: express.Response) => this.restart(req, res));
         app.get('/health', (req: express.Request, res: express.Response) => { res.end(); });
-        app.get('/infos', (req: express.Request, res: express.Response) => { this.showInfos( req.query.env, res); });
+        app.get('/infos', (req: express.Request, res: express.Response) => { this.showInfos(req.query.env, res); });
     }
 
     start() {
@@ -65,6 +65,9 @@ export class Server {
 
     private initialize() {
         this.bootstrapAsync().then((result: any) => {
+            if (!result) {
+                return;
+            }
             let error = result.error;
             if (!error) {
                 if (result.status / 100 > 2) {
@@ -146,14 +149,9 @@ export class Server {
     private bootstrapAsync() {
         let manager = process.env.VULCAIN_SERVER;
         if (!manager) {
-            util.log("ERROR: VULCAIN_SERVER must be defined");
-            process.exit(1);
+            return Promise.resolve(null);
         }
         let cluster = process.env.VULCAIN_ENV;
-        if (!cluster) {
-            util.log("ERROR: VULCAIN_ENV must be defined");
-            process.exit(1);
-        }
         let token = process.env.VULCAIN_TOKEN;
         if (!token) {
             util.log("ERROR: You must provided a token.");
@@ -192,8 +190,7 @@ export class Server {
     }
 
     private showInfos(env: string, res: express.Response) {
-        if (!env)
-        {
+        if (!env) {
             res.status(400).end();
             return;
         }

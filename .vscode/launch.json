@@ -17,7 +17,6 @@
 			"env": {
 				"EXPIRATION_EMAIL" : "dummy@mail.com",
 				"TEST": "true",
-				"VULCAIN_SERVER": "vulcain-ui",
 				"VULCAIN_ENV": "test-v1",
 				"VULCAIN_TEST": "true",
 				"VULCAIN_TOKEN": "02f772f0-54d4-11e6-8b6e-affc171e6d8b"
