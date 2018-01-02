@@ -7,45 +7,19 @@
 			"request": "launch",
 			"program": "${workspaceRoot}/src/index.ts",
 			"stopOnEntry": false,
-			"preLaunchTask": "compile-ts",
+			"preLaunchTask": "build",
 			"args": [],
-			"smartStep": true,
 			"cwd": "${workspaceRoot}",
-			"runtimeExecutable": null,
-			"runtimeArgs": [
-			],
 			"env": {
-				"EXPIRATION_EMAIL" : "dummy@mail.com",
 				"TEST": "true",
-				"VULCAIN_ENV": "test-v1",
-				"VULCAIN_TEST": "true",
-				"VULCAIN_TOKEN": "02f772f0-54d4-11e6-8b6e-affc171e6d8b"
+				"CONFIG_FOLDER": "tmp"
 			},
 			"console": "integratedTerminal",
 			"sourceMaps": true,
-			"outDir": "${workspaceRoot}/dist"
+			"outFiles": [
+                "${workspaceRoot}/dist/src/**/*.js"
+            ]
 		},
-        {
-            "name": "Test",
-            "type": "node",
-			"request": "launch",
-			"smartStep": true,
-            "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
-            "stopOnEntry": false,
-            "preLaunchTask": "compile-test",
-            "args": ["${workspaceRoot}/dist-test/**/*.js"],
-            "cwd": "${workspaceRoot}",
-            "runtimeExecutable": null,
-            "runtimeArgs": [
-                "--harmony"
-            ],
-            "env": {
-                "NODE_ENV": "development"
-            },
-			"console": "integratedTerminal",
-            "sourceMaps": true,
-            "outDir": "${workspaceRoot}/dist-test"
-        },
 		{
 			"name": "Attach",
 			"type": "node",

@@ -7,13 +7,17 @@ export interface ServiceDefinition {
      */
     name: string;
     /**
-     * Service version
+     * Public path - overrided by pathPrefix  in service endpoint if any
+     *
      */
-    version: string;
+    path?: string;
     /**
-     * Public path - override /api/ in service endpoint
+     * Replace public path prefix with this value
+     * ex: if pathPrefix = api
+     *   publicPath = /v1/customer.all
+     *   target service path = /api/customer.all
      */
-    path: string;
+    pathPrefix?: string;
     /**
      * Exposed port service - Default 8080
      */
@@ -26,37 +30,48 @@ export interface ServiceDefinition {
  */
 export interface TenantDefinition {
     /**
-     * tenant name - If not provide ServiceDefinitions.tenantPattern must be provided
+     * tenant name - If not provide ServiceDefinitions.defaultTenantPattern must be provided
+     * Used to force a tenant
      */
     name?: string;
     /**
      * Domain name - A let's encrypt certificate will be created
      */
     domain: string;
+        /**
+     * Let's encrypt expiration email
+     */
+    email: string;
 }
 
 /**
- * Service list
+ * Service list for an environment
  */
 export interface ServiceDefinitions {
     /**
      * Current cluster (or environment) name
+     * Optional
      */
-    clusterName: string;
+    cluster?: string;
     /**
-     * Pattern to resolve tenant from uri host name
+     * Listen port (default 443)
      */
-    tenantPattern?: string;
+    port?: number;
     /**
-     * Tenant list
+     * Port used for testing (default 80)
+     */
+    testPort?: number;
+    /**
+     * Pattern to resolve tenant from uri host name (optional)
+     * Used to set x-vulcain-tenant header if no tenant.name is provided
+     */
+    defaultTenantPattern?: string;
+    /**
+     * Tenant list (FrontEnd)
      */
     tenants: Array<TenantDefinition>;
     /**
-     * Let's encrypt expiration email
-     */
-    email: string;
-    /**
-     * Services to expose publicly
+     * Services to expose publicly (Backend)
      */
     services: Array<ServiceDefinition>;
 }

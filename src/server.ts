@@ -13,6 +13,7 @@
 //    Copyright (c) Zenasoft
 //
 const util = require('util');
+import * as fs from 'fs';
 import * as express from 'express';
 const bodyParser = require('body-parser');
 import { Template } from './template';
@@ -21,6 +22,7 @@ import { ProxyManager } from './proxyManager';
 import { ServiceDefinitions } from './model';
 import { IEngine } from './host';
 const app = express();
+const YAML = require('yamljs');
 
 export class Server {
 
@@ -39,6 +41,10 @@ export class Server {
     }
 
     start() {
+        if (this.proxyManager.engine.isTestServer) {
+            util.log("*** Test mode enabled. ***")
+        }
+
         // Start server
         app.listen(29000, (err) => {
             if (err) {
@@ -52,7 +58,7 @@ export class Server {
             // When server is initialized, run haproxy with initial configuration
             //
             this.proxyManager
-                .startProxy(true)
+                .startProxy()
                 .then(() => {
                     setTimeout(this.initialize.bind(this), 2000); // waiting for haproxy running
                 })
@@ -74,25 +80,14 @@ export class Server {
                     error = result.data;
                 }
                 else {
-                    try {
-                        let response = JSON.parse(result.data);
-                        if (response.error) {
-                            error = response.error.message;
-                        }
-                        else {
-                            let def = response.value;
-                            if (def.tenants && def.services) {
-                                let tpl = new Template(this.proxyManager, def);
-                                tpl.transform();
-                                tpl.proxyManager.purge(def.tenants);
-                            }
-                            else {
-                                util.log("No configurations founded.");
-                            }
-                        }
+                    let def = result.def;
+                    if (def.tenants && def.services) {
+                        let tpl = new Template(this.proxyManager, def);
+                        tpl.transform();
+                        tpl.proxyManager.purge(def.tenants);
                     }
-                    catch (e) {
-                        error = e;
+                    else {
+                        util.log("No configuration founded. Proxy is not started. Waiting for new configuration ...");
                     }
                 }
             }
@@ -141,15 +136,28 @@ export class Server {
 
     /**
      * First run
+     * Try to get service definitions from vulcain server or config file
      *
      * @returns
      *
      * @memberOf Server
      */
     private bootstrapAsync() {
+        var services = {};
+        var folder = process.env["CONFIG_FOLDER"];
+        var fn = (folder ? folder + "/" : "") + "services.yaml";
+        if( fs.existsSync(fn)) {
+            try {
+                services = YAML.parse(fs.readFileSync(fn, 'utf8'));
+            }
+            catch(e) {
+                util.log("Error when loading services.yaml - ", e.message);
+                process.exit(1);
+            }
+        }
         let manager = process.env.VULCAIN_SERVER;
         if (!manager) {
-            return Promise.resolve(null);
+            return Promise.resolve({def:services});
         }
         let cluster = process.env.VULCAIN_ENV;
         let token = process.env.VULCAIN_TOKEN;
@@ -174,12 +182,33 @@ export class Server {
 
         return new Promise((resolve, reject) => {
             let req = http.request(opts, (res) => {
-                let data = '';
+                let data:any = '';
                 res.on('data', (chunk) => {
                     data += chunk;
                 });
                 res.on('end', () => {
-                    resolve({ status: res && res.statusCode, data: data });
+                    let error;
+                    let def = {};
+                    let status = res.statusCode
+                    if (status / 100 > 2) {
+                        error = data;
+                    }
+                    else {
+                        try {
+                            let response = JSON.parse(data);
+                            if (response.error) {
+                                error = response.error.message;
+                            }
+                            else {
+                                def = response.value;
+                            }
+                        }
+                        catch(e) {
+                            error = e.message;
+                        }
+                    }
+
+                    resolve({ error, def: {...services, def} });
                 });
             });
             req.on('error', (e) => {
@@ -190,12 +219,7 @@ export class Server {
     }
 
     private showInfos(env: string, res: express.Response) {
-        if (!env) {
-            res.status(400).end();
-            return;
-        }
-
-        let tpl = new Template(this.proxyManager, <any>{ clusterName: env });
+        let tpl = new Template(this.proxyManager, <any>{ cluster: env });
         let cfg = tpl.getCurrentHaproxyConfiguration();
         res.send({ config: cfg }); // TODO log
     }

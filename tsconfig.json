@@ -1,13 +1,18 @@
 {
+    "compileOnSave": false,
     "compilerOptions": {
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true,
         "declaration": true,
         "module": "commonjs",
         "moduleResolution": "node",
-        "sourceMap": true,
         "target": "es6",
+        "sourceMap": true,
         "outDir": "dist",
-        "watch": false
-    }
+        "rootDir": "."
+    },
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
 }

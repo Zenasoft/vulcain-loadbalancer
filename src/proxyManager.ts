@@ -23,7 +23,7 @@ import * as Path from 'path';
  */
 export class ProxyManager {
     private restarting = false;
-
+    private firstTime: boolean = true;
     constructor(public engine: IEngine) {
     }
 
@@ -36,7 +36,7 @@ export class ProxyManager {
         if (!this.restarting) {
             this.restarting = true;
             setTimeout(function () {
-                self.startProxy(false)
+                self.startProxy()
                     .then(() => { self.restarting = false; })
                     .catch(e => { self.restarting = false; });
             }, 2000);
@@ -62,7 +62,7 @@ export class ProxyManager {
             });
         }
         catch (e) {
-            return;
+            return null;
         }
         return args.join(" ");
     }
@@ -70,22 +70,28 @@ export class ProxyManager {
     // -------------------------------------------------------------------
     // Start or restart proxy
     // -------------------------------------------------------------------
-    public startProxy(firstTime: boolean) {
+    public startProxy() {
 
         const configFile = this.createConfigFileArguments();
 
-        // First time just start haproxy
-        //  -p /var/haproxy/haproxy.pid : Tell haproxy to store process id and child process id in haproxy.pid
-        //  -f /var/haproxy/haproxy.cfg ... : use a specific config file (works with share volume with service discover)
-        if (firstTime) {
-            util.log("Starting haproxy with " + configFile);
-            return this.engine.processCommandAsync("haproxy " + configFile + " -p /var/run/haproxy.pid", "Start haproxy");
+        if (configFile) {
+            // First time just start haproxy
+            //  -p /var/haproxy/haproxy.pid : Tell haproxy to store process id and child process id in haproxy.pid
+            //  -f /var/haproxy/haproxy.cfg ... : use a specific config file (works with share volume with service discover)
+            if (this.firstTime) {
+                this.firstTime = false;
+                util.log("Starting haproxy with " + configFile);
+                return this.engine.processCommandAsync("haproxy " + configFile + " -p /var/run/haproxy.pid", "Start haproxy");
+            }
+            else {
+                // Soft restart
+                // -sf : tells haproxy to send sigterm to all pid of the old haproxy process when the new process is ready
+                util.log("Restarting haproxy with " + configFile);
+                return this.engine.processCommandAsync("haproxy " + configFile + " -p /var/run/haproxy.pid -sf $(cat /var/run/haproxy.pid)", "Restart haproxy");
+            }
         }
         else {
-            // Soft restart
-            // -sf : tells haproxy to send sigterm to all pid of the old haproxy process when the new process is ready
-            util.log("Restarting haproxy with " + configFile);
-            return this.engine.processCommandAsync("haproxy " + configFile + " -p /var/run/haproxy.pid -sf $(cat /var/run/haproxy.pid)", "Restart haproxy");
+            return Promise.resolve(true);
         }
     }
 
@@ -116,7 +122,7 @@ export class ProxyManager {
         return new Promise((resolve, reject) => {
             fs.exists(Path.join(this.engine.certificatesFolder, domain), exists => {
                 if (!exists) {
-                    this.engine.createCertificateAsync(domain, email || process.env["EXPIRATION_EMAIL"])
+                    this.engine.createCertificateAsync(domain, email)
                         .then(resolve)
                         .catch(reject);
                 }

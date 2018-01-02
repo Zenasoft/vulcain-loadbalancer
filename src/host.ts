@@ -60,10 +60,11 @@ class MockEngine implements IEngine {
     constructor() {
         this.certificatesFolder = "./data/certificates";
         this.configurationsFolder = "./data/config";
+        shell.mkdir("-p", this.configurationsFolder);
     }
 
     isTestServer() {
-        return process.env.VULCAIN_TEST === "true";
+        return true;
     }
 
     revokeCertificate(letsEncryptFolder: string, domain: string) {
@@ -145,8 +146,10 @@ class HostEngine implements IEngine {
     createCertificateAsync(domain: string, email: string): Promise<any> {
         util.log("Creating certificate for domain " + domain);
         return new Promise((resolve, reject) => {
-
-            childProcess.execFile("/app/cert-creation.sh", [domain, email || process.env["EXPIRATION_EMAIL"]], { cwd: "/app" }, (err, stdout, stderr) => {
+            if (!email) {
+                throw new Error("Validation email is required.");
+            }
+            childProcess.execFile("/app/cert-creation.sh", [domain, email], { cwd: "/app" }, (err, stdout, stderr) => {
                 if (err) {
                     util.log(`Error when creating certificate for ${domain} - ${err}
                     -----------------------\n`);
