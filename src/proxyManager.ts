@@ -44,7 +44,7 @@ export class ProxyManager {
     }
 
     // -------------------------------------------------------------------
-    // combines all config file (one by cluster + default)
+    // combines all config file (one by env + default)
     // -------------------------------------------------------------------
     private createConfigFileArguments() {
         const folder = this.engine.configurationsFolder;

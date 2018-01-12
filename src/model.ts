@@ -12,7 +12,7 @@ export interface ServiceDefinition {
      */
     path?: string;
     /**
-     * Replace public path prefix with this value
+     * Replace public path prefix with this value (default is api)
      * ex: if pathPrefix = api
      *   publicPath = /v1/customer.all
      *   target service path = /api/customer.all
@@ -22,6 +22,10 @@ export interface ServiceDefinition {
      * Exposed port service - Default 8080
      */
     port?: number;
+    /**
+     * Filter for a specific tenant
+     */
+    tenant?: string;
 }
 
 /**
@@ -33,12 +37,12 @@ export interface TenantDefinition {
      * tenant name - If not provide ServiceDefinitions.defaultTenantPattern must be provided
      * Used to force a tenant
      */
-    name?: string;
+    tenant?: string;
     /**
      * Domain name - A let's encrypt certificate will be created
      */
     domain: string;
-        /**
+    /**
      * Let's encrypt expiration email
      */
     email: string;
@@ -49,10 +53,10 @@ export interface TenantDefinition {
  */
 export interface ServiceDefinitions {
     /**
-     * Current cluster (or environment) name
+     * Environment name
      * Optional
      */
-    cluster?: string;
+    env?: string;
     /**
      * Listen port (default 443)
      */
@@ -69,7 +73,7 @@ export interface ServiceDefinitions {
     /**
      * Tenant list (FrontEnd)
      */
-    tenants: Array<TenantDefinition>;
+    fronts: Array<TenantDefinition>;
     /**
      * Services to expose publicly (Backend)
      */

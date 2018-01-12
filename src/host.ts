@@ -55,12 +55,14 @@ export interface IEngine {
 
 class MockEngine implements IEngine {
     public certificatesFolder: string;
-    public configurationsFolder: string;
 
     constructor() {
         this.certificatesFolder = "./data/certificates";
-        this.configurationsFolder = "./data/config";
         shell.mkdir("-p", this.configurationsFolder);
+    }
+
+    get configurationsFolder() {
+        return "./data/config"
     }
 
     isTestServer() {
@@ -92,7 +94,7 @@ class HostEngine implements IEngine {
     public configurationsFolder = "/var/haproxy";
 
     isTestServer() {
-        return process.env.VULCAIN_ENV_MODE === "test";
+        return false;
     }
 
     revokeCertificate(letsEncryptFolder: string, domain: string) {
@@ -112,11 +114,11 @@ class HostEngine implements IEngine {
                         shell.rm(letsEncryptFolder + "/../renewal/" + domain + ".conf");
                     }
                     catch (e) {
-                        util.log(`Certificat revocation failed for domain ${domain}`);
+                        util.log(`Certificate revocation failed for domain ${domain}`);
                     }
                 }
                 else {
-                    util.log(`Certificat revocation failed for domain ${domain}`);
+                    util.log(`Certificate revocation failed for domain ${domain}`);
                     console.log(stderr);
                 }
                 resolve();
@@ -170,7 +172,8 @@ export class EngineFactory {
 
     static createEngine(): IEngine {
         if (!EngineFactory._engine) {
-            EngineFactory._engine = process.env.TEST ? new MockEngine() : new HostEngine();
+            let test = (process.env.MODE || "").startsWith("test");
+            EngineFactory._engine = test ? new MockEngine() : new HostEngine();
         }
         return EngineFactory._engine;
     }

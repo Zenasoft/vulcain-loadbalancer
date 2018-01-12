@@ -7,12 +7,13 @@
 			"request": "launch",
 			"program": "${workspaceRoot}/src/index.ts",
 			"stopOnEntry": false,
+			"smartStep": true,
 			"preLaunchTask": "build",
 			"args": [],
 			"cwd": "${workspaceRoot}",
 			"env": {
-				"TEST": "true",
-				"CONFIG_FOLDER": "tmp"
+				"MODE": "test-proxy",
+				"CONFIG_FILE": "test/services.yml"
 			},
 			"console": "integratedTerminal",
 			"sourceMaps": true,

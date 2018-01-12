@@ -1,6 +1,6 @@
 # Vulcain load-balancer
 
-Public proxy for vulcain environnement based on haproxy with automatic letsencrypt certificat generation and renewal.
+Public proxy based on haproxy with automatic letsencrypt certificate generation and renewal.
 
 ## Installation
 
@@ -8,27 +8,23 @@ Public proxy for vulcain environnement based on haproxy with automatic letsencry
 docker volume create --name Certificates
 
 docker service create --name load-balancer -p 80:80 -p 443:443 -p 29000:29000 --network net-$env \
-    -e VULCAIN_SERVER=${server} -e VULCAIN_ENV=$env -e VULCAIN_TOKEN=xxxxx -e VULCAIN_ENV_MODE=prod \
-    -e EXPIRATION_EMAIL=xxx@mail.com \
     --mount type=volume,src=Certificates,dst=/etc/letsencrypt \
     vulcain/load-balancer
 ```
 
 > Must be in the same network than vulcain microservices.
 
-| Variables | Description | Mandatory
-|-|-|:-:
-| **VULCAIN_ENV** | Vulcain environnement name | true
-| **VULCAIN_SERVER**  | Vulcain server address | false
-| **VULCAIN_TOKEN** | Valid vulcain token | false, true if **VULCAIN_SERVER** is set
-| **VULCAIN_ENV_MODE** | 'test' or 'prod' (prod by default) | false
-| **EXPIRATION_EMAIL** | email for letsencrypt certificate expirations | true
-| **STAGING** | use let's encrypt staging | false
-
-> test mode use only port 80 and disable certificates management.
-
 * Accept only https connection (request on port 80 are redirected)
-* port 29000 is used for management and must not be accessible from outside
+* port 29000 is used for api management and must not be accessible from outside
+
+| Env. variable | | |
+| MODE | optional | if 'test', use only port 80 and disable certificates management |
+| CONFIG_FOLDER | optional | default to '/etc/vulcain/services.yml' |
+| VULCAIN_SERVER| optional | See Server api |
+| VULCAIN_TOKEN| optional (1) | |
+| VULCAIN_ENV| optional (1) | |
+
+> (1) Required if **VULCAIN_SERVER** is set
 
 ## API
 
@@ -40,3 +36,6 @@ GET: host:29000/restart : Restart haproxy
 GET: host:29000/health : Health endpoint
 
 GET: host:29000/infos?env=xxx : Show current configuration for a specific environment
+
+## Server API
+GET /api/service.config?env=

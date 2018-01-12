@@ -53,7 +53,7 @@ export class Server {
                 return;
             }
 
-            util.log("Load balancer ready. Listening on port 29000");
+            util.log("Load balancer ready. Listening on port 29000 for api management");
 
             // When server is initialized, run haproxy with initial configuration
             //
@@ -69,6 +69,11 @@ export class Server {
         });
     }
 
+    /**
+     * First initialization
+     * Get initial configuration from local file or remote server (see bootstrapAsync) and
+     *  create a new haproxy config file before starting it
+     */
     private initialize() {
         this.bootstrapAsync().then((result: any) => {
             if (!result) {
@@ -80,11 +85,11 @@ export class Server {
                     error = result.data;
                 }
                 else {
-                    let def = result.def;
-                    if (def.tenants && def.services) {
+                    let def: ServiceDefinitions = result.def;
+                    if (def.fronts && def.services) {
                         let tpl = new Template(this.proxyManager, def);
                         tpl.transform();
-                        tpl.proxyManager.purge(def.tenants);
+                        tpl.proxyManager.purge(def.fronts);
                     }
                     else {
                         util.log("No configuration founded. Proxy is not started. Waiting for new configuration ...");
@@ -98,7 +103,8 @@ export class Server {
     }
 
     // -------------------------------------------------------------------
-    // Reload configuration
+    // Update configuration from api
+    // Restart haproxy
     // -------------------------------------------------------------------
     private async updateConfiguration(req: express.Request, res: express.Response) {
         try {
@@ -109,8 +115,8 @@ export class Server {
                 await tpl.transform();
 
                 // Remove unused certificates
-                util.log("Updating domains");
-                this.proxyManager.purge(def.tenants);
+                util.log("Pruning certificates");
+                this.proxyManager.purge(def.fronts);
 
                 res.end("OK");
             }
@@ -126,7 +132,7 @@ export class Server {
     }
 
     // -------------------------------------------------------------------
-    // Restart
+    // Restart haproxy with the same configuration (from api)
     // -------------------------------------------------------------------
     private restart(req: express.Request, res: express.Response) {
         util.log("Restarting haproxy");
@@ -137,15 +143,11 @@ export class Server {
     /**
      * First run
      * Try to get service definitions from vulcain server or config file
-     *
-     * @returns
-     *
-     * @memberOf Server
      */
     private bootstrapAsync() {
         var services = {};
-        var folder = process.env["CONFIG_FOLDER"];
-        var fn = (folder ? folder + "/" : "") + "services.yaml";
+
+        var fn = process.env["CONFIG_FILE"] || "/etc/vulcain/services.yaml";
         if( fs.existsSync(fn)) {
             try {
                 services = YAML.parse(fs.readFileSync(fn, 'utf8'));
@@ -155,24 +157,25 @@ export class Server {
                 process.exit(1);
             }
         }
+
         let manager = process.env.VULCAIN_SERVER;
         if (!manager) {
             return Promise.resolve({def:services});
         }
-        let cluster = process.env.VULCAIN_ENV;
+        let env = process.env.VULCAIN_ENV;
         let token = process.env.VULCAIN_TOKEN;
         if (!token) {
             util.log("ERROR: You must provided a token.");
             process.exit(1);
         }
 
-        util.log(`Getting proxy configuration for environment ${cluster} on ${manager}`);
+        util.log(`Getting proxy configuration for environment ${env} on ${manager}`);
 
         // Getting information from vulcain server for initialize config
         let parts = manager.split(':');
         let opts: http.RequestOptions = {
             method: "get",
-            path: "/api/service.getproxyconfiguration?cluster=" + cluster,
+            path: "/api/service.config?env=" + env,
             host: parts[0],
             port: parts.length > 1 ? parseInt(parts[1]) : 80,
             headers: {
@@ -219,7 +222,7 @@ export class Server {
     }
 
     private showInfos(env: string, res: express.Response) {
-        let tpl = new Template(this.proxyManager, <any>{ cluster: env });
+        let tpl = new Template(this.proxyManager, <any>{ env });
         let cfg = tpl.getCurrentHaproxyConfiguration();
         res.send({ config: cfg }); // TODO log
     }

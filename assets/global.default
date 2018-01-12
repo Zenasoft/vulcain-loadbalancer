@@ -18,16 +18,14 @@ defaults
   mode http
   option http-server-close
   log     global
+  option	httplog
   option  dontlognull
-  retries 1
   option redispatch
-  maxconn 300
-  timeout connect  4s
-  timeout client   10s
-  timeout server   30s
+  timeout connect  5000
+  timeout client   50000
+  timeout server   50000
   timeout http-keep-alive 4s
-  timeout http-request 10s
-  default-server init-addr last,libc,none
+  timeout http-request 50000
 
 frontend www-http
   bind *:80
@@ -37,6 +35,13 @@ frontend www-http
 
 backend www-backend
   redirect scheme https
+
+listen stats
+    bind *:1936
+    stats enable
+    stats hide-version
+    stats realm Haproxy\ Statistics
+    stats uri /
 
 backend letsencrypt-backend
   dispatch 127.0.0.1:29000

@@ -6,6 +6,7 @@ RUN echo deb http://ftp.debian.org/debian jessie-backports main >> /etc/apt/sour
     apt-get -y install certbot -t jessie-backports && \
     apt-get -y install nodejs supervisor cron && apt-get clean
 
+EXPOSE 1936
 EXPOSE 29000
 EXPOSE 443
 EXPOSE 80

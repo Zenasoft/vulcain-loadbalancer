@@ -1,0 +1,19 @@
+# Sample for initial configuration
+
+# Optional fields
+env: test
+port: 443 # default
+testPort: 80 # default
+defaultTenantPattern: (/w*)\.mydomain.com # default. Used to set x-vulcain-tenant header
+# End optionals
+
+fronts:
+  - domain: customer1.mydomain.com # Required
+    email: admin@mydomain.com # Required. Domain administrator email
+    tenant: customer1 # Optional if not set defaultTenantPattern is used to resolve tenant name and set x-vulcain-tenant header
+
+services:
+  - name: gateway.customer1.svc.cluster.local
+    publicPath: /public # optional - Filter only request where path begins with /public ignore all others
+    prefixPath: /api # optional - replace publicpath with prefixpath
+    tenant: customer1 # optional - Filter for a specific tenant only
