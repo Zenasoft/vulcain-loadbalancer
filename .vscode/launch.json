@@ -12,7 +12,7 @@
 			"args": [],
 			"cwd": "${workspaceRoot}",
 			"env": {
-				"MODE": "test-proxy",
+				"MODE": "test",
 				"CONFIG_FILE": "test/services.yml"
 			},
 			"console": "integratedTerminal",

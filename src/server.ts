@@ -42,7 +42,7 @@ export class Server {
 
     start() {
         if (this.proxyManager.engine.isTestServer) {
-            util.log("*** Test mode enabled. ***")
+            util.log("*** Test mode enabled. ***");
         }
 
         // Start server
@@ -192,7 +192,7 @@ export class Server {
                 res.on('end', () => {
                     let error;
                     let def = {};
-                    let status = res.statusCode
+                    let status = res.statusCode;
                     if (status / 100 > 2) {
                         error = data;
                     }
@@ -211,7 +211,7 @@ export class Server {
                         }
                     }
 
-                    resolve({ error, def: {...services, def} });
+                    resolve({ error, def: Object.assign( services, def ) });
                 });
             });
             req.on('error', (e) => {

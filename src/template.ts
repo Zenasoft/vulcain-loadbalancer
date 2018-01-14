@@ -66,7 +66,7 @@ export class Template {
         }
 
         this.frontends.push("  mode http");
-        this.frontends.push("  reqidel ^x-vulcain"); // remove all incoming headers beginning with x-vulcain
+        this.frontends.push("  http-request del-header ^x-vulcain"); // remove all incoming headers beginning with x-vulcain
         //this.frontends.push("  option httplog");
         //this.frontends.push("  option dontlognull");
         //this.frontends.push("  log global");
@@ -184,16 +184,20 @@ export class Template {
                 publicPath = '/' + publicPath;
             }
             let acl = backend + "_public_acl";
-            aclIf = " if  acl " + acl + " path_reg ^" + publicPath + "/?([?\\#/].*)?$";
+            this.backends.push("  acl " + acl + " path_reg ^" + publicPath + "/?([?\\#/].*)?$");
+            aclIf = " if " + acl;
         }
 
         if (service.tenant) {
-            if (!aclIf)
-                aclIf = " if ";
-            aclIf += " req.fhdr(x-vulcain-tenant) -i " + service.tenant;
+            let acl = backend + "_tenant_acl";
+            this.backends.push("  acl " + acl + " req.fhdr(x-vulcain-tenant) -i " + service.tenant);
+            if (aclIf)
+                aclIf += " " + acl;
+            else
+                aclIf = " if " + acl;
         }
 
-        this.frontends.push("  use_backend " + backend + aclIf);
+        this.backends.push("  use_backend " + backend + aclIf);
 
         this.backends.push("");
         this.backends.push("# " + service.name);
