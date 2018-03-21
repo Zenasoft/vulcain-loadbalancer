@@ -1,13 +1,29 @@
+
+export class TEST {
+    public static isTest() {{ return  process.env.MODE === "test";} }
+    public static isDryRun() { return TEST.isTest() || process.env.MODE === "dry-run";}
+}
+
 /**
- * Service definition
+ * Tenant definition
+ * Match tenant name and host name
  */
-export interface ServiceDefinition {
+export interface RuleDefinition {
     /**
-     * Service name (dns)
+     * tenant name - If not provide ServiceDefinitions.defaultTenantPattern must be provided
+     * Used to force a tenant
      */
-    name: string;
+    tenant?: string;
     /**
-     * Public path - overrided by pathPrefix  in service endpoint if any
+     * Host name
+     */
+    hostName: string;
+    /**
+     * Domain name - A let's encrypt certificate will be created
+     */
+    tlsDomain?: string;
+    /**
+     * Public path - overrided by pathPrefix in service endpoint if any
      *
      */
     path?: string;
@@ -19,63 +35,34 @@ export interface ServiceDefinition {
      */
     pathPrefix?: string;
     /**
+     * Service name (dns)
+     */
+    serviceName: string;
+    /**
      * Exposed port service - Default 8080
      */
-    port?: number;
-    /**
-     * Filter for a specific tenant
-     */
-    tenant?: string;
-}
-
-/**
- * Tenant definition
- * Match tenant name and host name
- */
-export interface TenantDefinition {
-    /**
-     * tenant name - If not provide ServiceDefinitions.defaultTenantPattern must be provided
-     * Used to force a tenant
-     */
-    tenant?: string;
-    /**
-     * Domain name - A let's encrypt certificate will be created
-     */
-    domain: string;
-    /**
-     * Let's encrypt expiration email
-     */
-    email: string;
+    servicePort?: number;
 }
 
 /**
  * Service list for an environment
  */
-export interface ServiceDefinitions {
+export interface IngressDefinition {
     /**
-     * Environment name
-     * Optional
+     * Name
      */
     env?: string;
     /**
-     * Listen port (default 443)
+     * Let's encrypt expiration email
      */
-    port?: number;
+    tlsEmail?: string;
     /**
-     * Port used for testing (default 80)
-     */
-    testPort?: number;
-    /**
-     * Pattern to resolve tenant from uri host name (optional)
+     * Regex pattern to resolve tenant from uri host name (optional)
      * Used to set x-vulcain-tenant header if no tenant.name is provided
      */
     defaultTenantPattern?: string;
     /**
-     * Tenant list (FrontEnd)
+     * Rules
      */
-    fronts: Array<TenantDefinition>;
-    /**
-     * Services to expose publicly (Backend)
-     */
-    services: Array<ServiceDefinition>;
+    rules: Array<RuleDefinition>;
 }

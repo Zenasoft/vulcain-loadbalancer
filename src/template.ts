@@ -14,7 +14,7 @@
 //
 import * as Path from 'path';
 import * as fs from 'fs';
-import { ServiceDefinitions, ServiceDefinition } from './model';
+import { IngressDefinition, RuleDefinition, TEST } from './model';
 const util = require('util');
 
 // Create template for haproxy and notify proxy container to restart if
@@ -36,7 +36,7 @@ export class Template {
         return configFileName;
     }
 
-    constructor(public proxyManager: ProxyManager, private def: ServiceDefinitions) {
+    constructor(public proxyManager: ProxyManager, private def: IngressDefinition) {
         if (!def.env)
             def.env = "default";
     }
@@ -47,46 +47,30 @@ export class Template {
 
         util.log("Generating new haproxy configuration file...");
 
-        this.frontends = [];
-        this.backends = [];
-
-        this.frontends.push(
-            "frontend " + this.def.env
-        );
-
         let newConfig: string = "";
-        this.backends.push("");
 
-        let hasFrontends: boolean = true;
-        if (this.proxyManager.engine.isTestServer()) {
-            await this.emitTestFront();
-        }
-        else {
-            hasFrontends = await this.emitFront();
-        }
+        this.frontends = [];
+        this.backends = [""];
 
-        this.frontends.push("  mode http");
-        this.frontends.push("  http-request del-header ^x-vulcain"); // remove all incoming headers beginning with x-vulcain
-        //this.frontends.push("  option httplog");
-        //this.frontends.push("  option dontlognull");
-        //this.frontends.push("  log global");
-        this.emitTenantRules();
+        if (await this.emitBinding()) {
 
-        if (hasFrontends) {
-            for (let service of this.def.services) {
-                this.emitBackends(service);
-            }
+            this.frontends.push("  mode http");
+            this.frontends.push("  http-request del-header ^x-vulcain"); // remove all incoming headers beginning with x-vulcain
+            //this.frontends.push("  option httplog");
+            //this.frontends.push("  option dontlognull");
+            //this.frontends.push("  log global");
+
+            await this.emitFronts();
 
             newConfig = this.frontends.join('\n');
             newConfig += this.backends.join('\n');
-        }
 
-        if (!hasFrontends || !newConfig) {
-            shell.rm(this.configFileName);
-        }
-        else {
             fs.writeFileSync(this.configFileName, newConfig);
         }
+        else {
+            shell.rm(this.configFileName);
+        }
+
         this.proxyManager.restart();
     }
 
@@ -106,18 +90,36 @@ export class Template {
      *
      * @memberOf Template
      */
-    private async emitFront() {
+    private async emitBinding() {
+        this.frontends.push("frontend " + this.def.env);
+
+        if (TEST.isTest()) {
+            this.frontends.push(`  bind *:80`);
+            return true;
+        }
+
+        // Create certificates list for https binding
         let crtList = [];
         let crtFileName = Path.join(this.proxyManager.engine.configurationsFolder, "list.crt");
         let hasFrontEnds = false;
 
-        for (const tenant of this.def.fronts) {
-            if (tenant) {
-                let domainName = tenant.domain;
+        for (const tenant of this.def.rules) {
+            if (tenant && tenant.tlsDomain) {
+                let domainName = tenant.tlsDomain;
                 try {
-                    await this.proxyManager.createCertificate(domainName, tenant.email);
-                    crtList.push(Path.join(this.proxyManager.engine.certificatesFolder, domainName, "haproxy.pem"));
-                    hasFrontEnds = true;
+                    let dn = domainName;
+                    if (domainName.startsWith("*.")) // Can be a wildward domain
+                        dn = domainName.substr(2);
+
+                    if (dn) {
+                        let fullName = Path.join(this.proxyManager.engine.certificatesFolder, dn, "haproxy.pem").toLowerCase();
+                        if (crtList.indexOf(fullName) < 0) {
+                            // Ensures certificate exist
+                            await this.proxyManager.createCertificate(domainName, this.def.tlsEmail);
+                            crtList.push(fullName);
+                            hasFrontEnds = true;
+                        }
+                    }
                 }
                 catch (e) {
                     util.log("Creating certificate for domain " + domainName + " failed. " + e.message);
@@ -126,8 +128,7 @@ export class Template {
         }
 
         fs.writeFileSync(crtFileName, crtList.join('\n'));
-
-        this.frontends.push(`  bind *:${this.def.port || 443} ssl crt-list ${crtFileName}`);
+        this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
 
         return hasFrontEnds;
     }
@@ -135,8 +136,9 @@ export class Template {
     /**
      * Try to set x-vulcain-tenant header based on domain name
      */
-    private emitTenantRules() {
-        // Default rule
+    private emitFronts() {
+
+        // Default rule for tenant resolution
         if (this.def.defaultTenantPattern) {
             this.frontends.push("  http-request set-header x-vulcain-tenant pattern:" + this.def.defaultTenantPattern);
         }
@@ -144,37 +146,41 @@ export class Template {
             this.frontends.push("  http-request set-header x-vulcain-tenant ?"); // must be resolved by the service
         }
 
-        if (this.def.fronts) {
-            for (const tenant of this.def.fronts) {
+        let acls = {};
+        let cx = 0;
+        if (this.def.rules) {
+            for (const tenant of this.def.rules) {
+                cx++;
+
                 // If a tenant has a name then use it
                 if (tenant && tenant.tenant) {
-                    this.frontends.push("  # " + tenant.tenant);
+                    this.frontends.push("  # " + tenant.hostName);
 
-                    let domainName = tenant.domain;
-                    let acl = 'host_' + domainName.replace(/\./g, '');
-                    this.frontends.push("  acl " + acl + " hdr(host) -i " + tenant.domain);
-                    this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.tenant + " if " + acl);
-
-                    if (this.proxyManager.engine.isTestServer()) {
-                        // http://test/api/...?$tenant=(tenant)
-                        this.frontends.push("  acl " + acl + "_test url_param($tenant) -i " + tenant.tenant);
-                        this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.tenant + " if " + acl + "_test");
+                    let domainName = tenant.hostName;
+                    let acl = acls[domainName] || cx;
+                    acls[domainName] = acl;
+                    if (domainName) {
+                        this.frontends.push("  acl host_" + acl + " hdr(host) -i " + domainName);
+                        this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.tenant + " if host_" + acl);
                     }
+
+                    if (TEST.isTest()) {
+                        // http://test/api/...?$tenant=(tenant)
+                        this.frontends.push("  acl host_" + acl + "_test url_param($tenant) -i " + tenant.tenant);
+                        this.frontends.push("  http-request set-header x-vulcain-tenant " + tenant.tenant + " if host_" + acl + "_test");
+                    }
+                    this.emitBackends(tenant, acl);
                 }
             }
         }
     }
 
-    private async emitTestFront() {
-        this.frontends.push(`  bind *:${this.def.testPort || 80}`);
-    }
-
-    private emitBackends(service: ServiceDefinition) {
-        let serviceName = this.def.env + "_" + service.name.replace(/\./g, "-");
+    private emitBackends(rule: RuleDefinition, index: number) {
+        let serviceName = `${this.def.env}_${rule.serviceName.replace(/\./g, "-")}_${index}`;
 
         let backend = "backend_" + serviceName;
-        let publicPath = service.path;
-        let aclIf = "";
+        let publicPath = rule.path;
+        let aclIf = " if host_" + index;
         if (publicPath) {
             // Filter backend by publicpath
             if (publicPath === '/') {
@@ -184,23 +190,23 @@ export class Template {
                 publicPath = '/' + publicPath;
             }
             let acl = backend + "_public_acl";
-            this.backends.push("  acl " + acl + " path_reg ^" + publicPath + "/?([?\\#/].*)?$");
-            aclIf = " if " + acl;
+            this.frontends.push("  acl " + acl + " path_reg ^" + publicPath + "/?([?\\#/].*)?$");
+            aclIf = aclIf + " " + acl;
         }
 
-        if (service.tenant) {
-            let acl = backend + "_tenant_acl";
-            this.backends.push("  acl " + acl + " req.fhdr(x-vulcain-tenant) -i " + service.tenant);
-            if (aclIf)
-                aclIf += " " + acl;
-            else
-                aclIf = " if " + acl;
-        }
+        // if (rule.tenant) {
+        //     let acl = backend + "_tenant_acl";
+        //     this.backends.push("  acl " + acl + " req.fhdr(x-vulcain-tenant) -i " + rule.tenant);
+        //     if (aclIf)
+        //         aclIf += " " + acl;
+        //     else
+        //         aclIf = " if " + acl;
+        // }
 
-        this.backends.push("  use_backend " + backend + aclIf);
+        this.frontends.push("  use_backend " + backend + aclIf);
 
         this.backends.push("");
-        this.backends.push("# " + service.name);
+        this.backends.push("# " + rule.serviceName);
         this.backends.push("backend " + backend);
 
         this.backends.push("  option forwardfor");
@@ -209,18 +215,18 @@ export class Template {
 
         this.backends.push("  mode http");
 
-        if (service.pathPrefix) {
+        if (rule.pathPrefix) {
             // Publicpath rewriting
             if (publicPath) {
                 this.backends.push(`  http-request add-header x-vulcain-publicpath ${publicPath}`);
-                this.backends.push("  reqrep ^([^\\ ]*)\\ " + publicPath + "([?\\#/].*)?   \\1\\ /" + service.pathPrefix + "\\2");
+                this.backends.push("  reqrep ^([^\\ ]*)\\ " + publicPath + "([?\\#/].*)?   \\1\\ /" + rule.pathPrefix + "\\2");
             }
-            else if (service.path) { // means /
+            else if (rule.path) { // means /
                 this.backends.push(`  http-request add-header x-vulcain-publicpath  /`);
-                this.backends.push("  reqrep ^([^\\ :]*)\\ /(.*)   \\1\\ /" + service.pathPrefix + "\\2");
+                this.backends.push("  reqrep ^([^\\ :]*)\\ /(.*)   \\1\\ /" + rule.pathPrefix + "\\2");
             }
         }
 
-        this.backends.push("  server " + serviceName + " " + service.name + ":" + (service.port || "8080"));
+        this.backends.push("  server " + serviceName + " " + rule.serviceName + ":" + (rule.servicePort || "8080"));
     }
 }

@@ -18,7 +18,7 @@ docker service create --name load-balancer -p 80:80 -p 443:443 -p 29000:29000 --
 * port 29000 is used for api management and must not be accessible from outside
 
 | Env. variable | | |
-| MODE | optional | if 'test', use only port 80 and disable certificates management |
+| MODE | optional | dry-run or test. if 'test', use only port 80 and disable certificates management |
 | CONFIG_FOLDER | optional | default to '/etc/vulcain/services.yml' |
 | VULCAIN_SERVER| optional | See Server api |
 | VULCAIN_TOKEN| optional (1) | |
