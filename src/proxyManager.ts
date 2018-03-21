@@ -12,7 +12,7 @@
 //
 //    Copyright (c) Zenasoft
 //
-import { TenantDefinition } from './model';
+import { RuleDefinition, CONTEXT } from './model';
 import { IEngine } from './host';
 const util = require('util');
 const fs = require('fs');
@@ -49,7 +49,7 @@ export class ProxyManager {
     private createConfigFileArguments() {
         const folder = this.engine.configurationsFolder;
 
-        const defaultName = this.engine.isTestServer() ? "test" : "global";
+        const defaultName = CONTEXT.isTest() ? "test" : "global";
         var args = ["-f " + Path.join(folder, defaultName + ".default")];
         try {
             var files = fs.readdirSync(folder);
@@ -95,7 +95,7 @@ export class ProxyManager {
         }
     }
 
-    purge(domains: Array<TenantDefinition>) {
+    purge(rules: Array<RuleDefinition>) {
         fs.exists(this.engine.certificatesFolder, exists => {
             if (!exists) {
                 return;
@@ -106,7 +106,7 @@ export class ProxyManager {
                     return;
                 }
 
-                let domainNames = domains.map(d => d.domain.toLowerCase());
+                let domainNames = rules.filter(d=>d.tlsDomain).map(d => { let dn = d.tlsDomain.toLowerCase(); if (dn.startsWith("*.*")) dn = dn.substr(2); return dn; });
 
                 for (const folder of folders) {
                     if (domainNames.find(d => d === folder.toLowerCase())) {
@@ -120,7 +120,10 @@ export class ProxyManager {
 
     createCertificate(domain: string, email: string) {
         return new Promise((resolve, reject) => {
-            fs.exists(Path.join(this.engine.certificatesFolder, domain), exists => {
+            let dn = domain;
+            if (domain.startsWith("*."))
+                dn = domain.substr(2);
+            fs.exists(Path.join(this.engine.certificatesFolder, dn), exists => {
                 if (!exists) {
                     this.engine.createCertificateAsync(domain, email)
                         .then(resolve)

@@ -19,7 +19,7 @@ const bodyParser = require('body-parser');
 import { Template } from './template';
 import * as http from 'http';
 import { ProxyManager } from './proxyManager';
-import { ServiceDefinitions } from './model';
+import { IngressDefinition, CONTEXT } from './model';
 import { IEngine } from './host';
 const app = express();
 const YAML = require('yamljs');
@@ -27,6 +27,7 @@ const YAML = require('yamljs');
 export class Server {
 
     private proxyManager: ProxyManager;
+    private currentDefinition: IngressDefinition;
 
     constructor(engine: IEngine) {
         this.proxyManager = new ProxyManager(engine);
@@ -34,17 +35,20 @@ export class Server {
         app.use(bodyParser.json());
         app.use(express.static("/app/letsencrypt"));
 
-        app.post('/update', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res));
+        app.post('/update', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res, false));
+        app.post('/delete', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res, true));
         app.post('/restart', (req: express.Request, res: express.Response) => this.restart(req, res));
         app.get('/health', (req: express.Request, res: express.Response) => { res.end(); });
         app.get('/infos', (req: express.Request, res: express.Response) => { this.showInfos(req.query.env, res); });
     }
 
     start() {
-        if (this.proxyManager.engine.isTestServer) {
-            util.log("*** Test mode enabled. ***");
+        if (CONTEXT.isTest()) {
+            util.log("*** Running in test mode. Listen to port 80 ***");
         }
-
+        else if (CONTEXT.isDryRun()) {
+            util.log("*** Running in dry-run mode ***");
+        }
         // Start server
         app.listen(29000, (err) => {
             if (err) {
@@ -75,7 +79,7 @@ export class Server {
      *  create a new haproxy config file before starting it
      */
     private initialize() {
-        this.bootstrapAsync().then((result: any) => {
+        this.bootstrapAsync().then(async (result: any) => {
             if (!result) {
                 return;
             }
@@ -85,15 +89,8 @@ export class Server {
                     error = result.data;
                 }
                 else {
-                    let def: ServiceDefinitions = result.def;
-                    if (def.fronts && def.services) {
-                        let tpl = new Template(this.proxyManager, def);
-                        tpl.transform();
-                        tpl.proxyManager.purge(def.fronts);
-                    }
-                    else {
-                        util.log("No configuration founded. Proxy is not started. Waiting for new configuration ...");
-                    }
+                    let def: IngressDefinition = result.def;
+                    await this.initializeProxyFromConfiguration(def);
                 }
             }
             if (error) {
@@ -102,22 +99,66 @@ export class Server {
         });
     }
 
+    private async initializeProxyFromConfiguration(def: IngressDefinition, removeRule=false) {
+        if (!this.currentDefinition || !def) {
+            this.currentDefinition = def;
+        } else {
+            if (!this.currentDefinition)
+                this.currentDefinition = <any>{};
+
+            // Merge with current
+            Object.keys(def).forEach(key => {
+                let value = def[key];
+                if (key === "rules") {
+                    let list = this.currentDefinition.rules || [];
+                    for (const rule of value) {
+                        let oldIndex = list.findIndex(r => r.serviceName === rule.serviceName);
+                        if (!removeRule) {
+                            let v = { ...list[oldIndex], ...rule };
+                            if (oldIndex < 0) {
+                                list.push(v);
+                            }
+                            else {
+                                list[oldIndex] = v;
+                            }
+                        }
+                        else if (oldIndex >= 0) {
+                            list.splice(oldIndex);
+                        }
+                    }
+                    value = list;
+                }
+                else if (removeRule) {
+                    // Only remove rule
+                    return;
+                }
+
+                this.currentDefinition[key] = value;
+            });
+        }
+
+        if (this.currentDefinition && this.currentDefinition.rules) {
+            let tpl = new Template(this.proxyManager, this.currentDefinition);
+            await tpl.transform();
+            // Remove unused certificates
+            util.log("Pruning certificates");
+            tpl.proxyManager.purge(this.currentDefinition.rules);
+        }
+        else {
+            util.log("No configuration founded. Waiting for new configuration ...");
+        }
+    }
+
     // -------------------------------------------------------------------
     // Update configuration from api
     // Restart haproxy
     // -------------------------------------------------------------------
-    private async updateConfiguration(req: express.Request, res: express.Response) {
+    private async updateConfiguration(req: express.Request, res: express.Response, removeRule: boolean) {
         try {
             util.log("Updating configuration");
-            let def: ServiceDefinitions = req.body;
+            let def: IngressDefinition = req.body;
             if (def) {
-                let tpl = new Template(this.proxyManager, def);
-                await tpl.transform();
-
-                // Remove unused certificates
-                util.log("Pruning certificates");
-                this.proxyManager.purge(def.fronts);
-
+                this.initializeProxyFromConfiguration(def, removeRule);
                 res.end("OK");
             }
             else {
@@ -148,20 +189,26 @@ export class Server {
         var services = {};
 
         var fn = process.env["CONFIG_FILE"] || "/etc/vulcain/services.yaml";
-        if( fs.existsSync(fn)) {
+        if (fs.existsSync(fn)) {
             try {
                 services = YAML.parse(fs.readFileSync(fn, 'utf8'));
             }
-            catch(e) {
+            catch (e) {
                 util.log("Error when loading services.yaml - ", e.message);
                 process.exit(1);
             }
         }
 
-        let manager = process.env.VULCAIN_SERVER;
-        if (!manager) {
-            return Promise.resolve({def:services});
+        let vulcainAddress = process.env.VULCAIN_SERVER;
+        if (!vulcainAddress) {
+            return Promise.resolve({ def: services });
         }
+
+        return this.getVulcainConfigurations(vulcainAddress, services);
+    }
+
+    private getVulcainConfigurations(vulcainAddress: string, services: any) {
+
         let env = process.env.VULCAIN_ENV;
         let token = process.env.VULCAIN_TOKEN;
         if (!token) {
@@ -169,10 +216,10 @@ export class Server {
             process.exit(1);
         }
 
-        util.log(`Getting proxy configuration for environment ${env} on ${manager}`);
+        util.log(`Getting proxy configuration for environment ${env} on ${vulcainAddress}`);
 
         // Getting information from vulcain server for initialize config
-        let parts = manager.split(':');
+        let parts = vulcainAddress.split(':');
         let opts: http.RequestOptions = {
             method: "get",
             path: "/api/service.config?env=" + env,
@@ -185,7 +232,7 @@ export class Server {
 
         return new Promise((resolve, reject) => {
             let req = http.request(opts, (res) => {
-                let data:any = '';
+                let data: any = '';
                 res.on('data', (chunk) => {
                     data += chunk;
                 });
@@ -206,12 +253,12 @@ export class Server {
                                 def = response.value;
                             }
                         }
-                        catch(e) {
+                        catch (e) {
                             error = e.message;
                         }
                     }
 
-                    resolve({ error, def: Object.assign( services, def ) });
+                    resolve({ error, def: Object.assign(services, def) });
                 });
             });
             req.on('error', (e) => {

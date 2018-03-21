@@ -2,18 +2,26 @@
 
 # Optional fields
 env: test
-port: 443 # default
-testPort: 80 # default
 defaultTenantPattern: (/w*)\.mydomain.com # default. Used to set x-vulcain-tenant header
+tlsEmail: admin@mydomain.com # (optional). Domain administrator email
 # End optionals
 
-fronts:
-  - domain: customer1.mydomain.com # Required
-    email: admin@mydomain.com # Required. Domain administrator email
+rules:
+  - hostName: customer1.mydomain.com # Required
+    tlsDomain: "*.mydomain.com"
     tenant: customer1 # Optional if not set defaultTenantPattern is used to resolve tenant name and set x-vulcain-tenant header
+    serviceName: service1
+    servicePort: 80 # optional default to 8080
+  - hostName: api.mydomain.com
+    tlsDomain: "*.mydomain.com"
+    serviceName: hopex-admin-10
+    servicePort: 8080
+    tenant: vulcain
+    path: /public # optional - Filter only request where path begins with /public ignore all others
+    pathPrefix: /api # optional - replace publicpath with prefixpath
+  - hostName: admin.mydomain.com
+    tlsDomain: "*.mydomain.com"
+    serviceName: hopex-ui-10
+    servicePort: 80
+    tenant: vulcain
 
-services:
-  - name: gateway.customer1.svc.cluster.local
-    publicPath: /public # optional - Filter only request where path begins with /public ignore all others
-    prefixPath: /api # optional - replace publicpath with prefixpath
-    tenant: customer1 # optional - Filter for a specific tenant only

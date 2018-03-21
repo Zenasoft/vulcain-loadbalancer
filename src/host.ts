@@ -1,6 +1,7 @@
 const util = require('util');
 import * as childProcess from 'child_process';
 import * as shell from 'shelljs';
+import { CONTEXT } from './model';
 
 /**
  * Host interaction
@@ -15,13 +16,6 @@ export interface IEngine {
      * Haproxy configuration files
      */
     configurationsFolder: string;
-    /**
-     * Test server listen on port 80 and do not generate certificates
-     * On test seever, you can simulates a tenant by providing a $tenant url parameter
-     *
-     * @memberOf IEngine
-     */
-    isTestServer(): boolean;
     /**
      * Revoke a certificate (sync)
      *
@@ -65,10 +59,6 @@ class MockEngine implements IEngine {
         return "./data/config"
     }
 
-    isTestServer() {
-        return true;
-    }
-
     revokeCertificate(letsEncryptFolder: string, domain: string) {
         util.log("Revoke certificate " + domain);
     }
@@ -82,9 +72,8 @@ class MockEngine implements IEngine {
     }
 
     createCertificateAsync(domain: string, email: string): Promise<any> {
-        util.log(`Create certificate for domain ${domain}
-        --------------------------\n`);
-        return Promise.reject(true);
+        util.log(`Create certificate for domain ${domain} --------------------------\n`);
+        return Promise.resolve(true);
     }
 }
 
@@ -92,10 +81,6 @@ class HostEngine implements IEngine {
 
     public certificatesFolder = "/etc/letsencrypt/live";
     public configurationsFolder = "/var/haproxy";
-
-    isTestServer() {
-        return false;
-    }
 
     revokeCertificate(letsEncryptFolder: string, domain: string) {
         const command = `certbot revoke -t -n --cert-path ${letsEncryptFolder}/${domain}/haproxy.pem`;
@@ -172,8 +157,7 @@ export class EngineFactory {
 
     static createEngine(): IEngine {
         if (!EngineFactory._engine) {
-            let test = (process.env.MODE || "").startsWith("test");
-            EngineFactory._engine = test ? new MockEngine() : new HostEngine();
+            EngineFactory._engine = CONTEXT.isDryRun() ? new MockEngine() : new HostEngine();
         }
         return EngineFactory._engine;
     }

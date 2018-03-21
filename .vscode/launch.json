@@ -12,8 +12,7 @@
 			"args": [],
 			"cwd": "${workspaceRoot}",
 			"env": {
-				"MODE": "test",
-				"CONFIG_FILE": "test/services.yml"
+				"MODE": "dry-run"
 			},
 			"console": "integratedTerminal",
 			"sourceMaps": true,
