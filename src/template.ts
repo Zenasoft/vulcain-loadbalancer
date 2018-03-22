@@ -43,16 +43,27 @@ export class Template {
 
     // see https://github.com/tutumcloud/haproxy
     //     https://serversforhackers.com/load-balancing-with-haproxy
-    async transform() {
-
+    async apply() {
         util.log("Generating new haproxy configuration file...");
 
+        const config = await this.transform(false);
+        if (config) {
+            fs.writeFileSync(this.configFileName, config);
+        }
+        else {
+            shell.rm(this.configFileName);
+        }
+
+        this.proxyManager.restart();
+    }
+
+    async transform(dryrun: boolean) {
         let newConfig: string = "";
 
         this.frontends = [];
         this.backends = [""];
 
-        if (await this.emitBinding()) {
+        if (await this.emitBinding(dryrun)) {
 
             this.frontends.push("  mode http");
             this.frontends.push("  http-request del-header ^x-vulcain"); // remove all incoming headers beginning with x-vulcain
@@ -65,13 +76,10 @@ export class Template {
             newConfig = this.frontends.join('\n');
             newConfig += this.backends.join('\n');
 
-            fs.writeFileSync(this.configFileName, newConfig);
-        }
-        else {
-            shell.rm(this.configFileName);
+            return newConfig;
         }
 
-        this.proxyManager.restart();
+        return null;
     }
 
     getCurrentHaproxyConfiguration() {
@@ -90,7 +98,7 @@ export class Template {
      *
      * @memberOf Template
      */
-    private async emitBinding() {
+    private async emitBinding(dryrun: boolean) {
         this.frontends.push("frontend " + this.def.env);
 
         if (CONTEXT.isTest()) {
@@ -103,31 +111,37 @@ export class Template {
         let crtFileName = Path.join(this.proxyManager.engine.configurationsFolder, "list.crt");
         let hasFrontEnds = false;
 
-        for (const rule of this.def.rules) {
-            hasFrontEnds = true;
-            if (rule && rule.tlsDomain) {
-                let domainName = rule.tlsDomain;
-                try {
-                    let dn = domainName;
-                    if (domainName.startsWith("*.")) // Can be a wildward domain
-                        dn = domainName.substr(2);
+        if (this.def.rules) {
+            for (const rule of this.def.rules) {
+                hasFrontEnds = true;
+                if (rule && rule.tlsDomain) {
+                    let domainName = rule.tlsDomain;
+                    try {
+                        let dn = domainName;
+                        if (domainName.startsWith("*.")) // Can be a wildward domain
+                            dn = domainName.substr(2);
 
-                    if (dn) {
-                        let fullName = Path.join(this.proxyManager.engine.certificatesFolder, dn, "haproxy.pem").toLowerCase();
-                        if (crtList.indexOf(fullName) < 0) {
-                            // Ensures certificate exist
-                            await this.proxyManager.createCertificate(domainName, this.def.tlsEmail);
-                            crtList.push(fullName);
+                        if (dn) {
+                            let fullName = Path.join(this.proxyManager.engine.certificatesFolder, dn, "haproxy.pem").toLowerCase();
+                            if (crtList.indexOf(fullName) < 0) {
+                                if (!dryrun) {
+                                    // Ensures certificate exist
+                                    await this.proxyManager.createCertificate(domainName, this.def.tlsEmail);
+                                }
+                                crtList.push(fullName);
+                            }
                         }
                     }
-                }
-                catch (e) {
-                    util.log("Creating certificate for domain " + domainName + " failed. " + e.message);
+                    catch (e) {
+                        util.log("Creating certificate for domain " + domainName + " failed. " + e.message);
+                    }
                 }
             }
         }
+        if (!dryrun) {
+            fs.writeFileSync(crtFileName, crtList.join('\n'));
+        }
 
-        fs.writeFileSync(crtFileName, crtList.join('\n'));
         if (crtList.length > 0) {
             this.frontends.push(`  bind *:443 ssl crt-list ${crtFileName}`);
         }
@@ -155,19 +169,26 @@ export class Template {
         let cx = 0;
         if (this.def.rules) {
             for (const rule of this.def.rules) {
-                if (rule && rule.hostName) {
-                    cx++;
-                    this.frontends.push("  # " + rule.hostName);
+                // Validation
+                if (!rule.hostName && !rule.path) {
+                    // Error
+                    continue;
+                }
 
-                    let domainName = rule.hostName;
-                    let acl = acls[domainName] || cx;
+                // TODO Check if rule.hostName + rule.pathPrefix exists* ?
+
+                cx++;
+                let domainName = rule.hostName;
+                let acl = acls[domainName] || cx;
+                if (domainName)
                     acls[domainName] = acl;
 
+                if (rule.hostName) {
+                    this.frontends.push("  # " + rule.hostName);
+                    this.frontends.push("  acl host_" + acl + " hdr(host) -i " + domainName);
+
                     if (rule.tenant) {
-                        if (domainName) {
-                            this.frontends.push("  acl host_" + acl + " hdr(host) -i " + domainName);
-                            this.frontends.push("  http-request set-header x-vulcain-tenant " + rule.tenant + " if host_" + acl);
-                        }
+                        this.frontends.push("  http-request set-header x-vulcain-tenant " + rule.tenant + " if host_" + acl);
 
                         if (CONTEXT.isTest()) {
                             // http://test/api/...?$tenant=(tenant)
@@ -175,9 +196,8 @@ export class Template {
                             this.frontends.push("  http-request set-header x-vulcain-tenant " + rule.tenant + " if host_" + acl + "_test");
                         }
                     }
-
-                    this.emitBackends(rule, acl);
                 }
+                this.emitBackends(rule, acl);
             }
         }
     }
@@ -186,19 +206,24 @@ export class Template {
         let serviceName = `${this.def.env}_${rule.serviceName.replace(/\./g, "-")}_${index}`;
 
         let backend = "backend_" + serviceName;
-        let publicPath = rule.path;
-        let aclIf = rule.tenant && rule.hostName ? " if host_" + index : " if";
+        let aclIf = rule.hostName ? " if host_" + index : " if";
 
-        if (publicPath) {
-            // Filter backend by publicpath
-            if (publicPath === '/') {
-                publicPath = '';
+        let publicPath: string;
+        if (rule.path) {
+            if (rule.path === '/') {
+                publicPath = "/(.*)?$"
             }
-            else if (publicPath[0] !== '/') {
-                publicPath = '/' + publicPath;
+            else {
+                if (rule.path[0] !== '/') {
+                    publicPath = `/${rule.path}([?\\#/].*)?$`;
+                }
+                else {
+                    publicPath = `${rule.path}([?\\#/].*)?$`;
+                }
             }
+
             let acl = backend + "_public_acl";
-            this.frontends.push("  acl " + acl + " path_reg ^" + publicPath + "/?([?\\#/].*)?$");
+            this.frontends.push("  acl " + acl + " path_reg ^" + publicPath);
             aclIf = aclIf + " " + acl;
         }
 
@@ -220,19 +245,12 @@ export class Template {
         this.backends.push("  option forwardfor");
         this.backends.push("  http-request set-header X-Forwarded-Port %[dst_port]");
         this.backends.push("  http-request add-header X-Forwarded-Proto https if { ssl_fc }");
-
         this.backends.push("  mode http");
 
-        if (rule.pathPrefix) {
-            // Publicpath rewriting
-            if (publicPath) {
-                this.backends.push(`  http-request add-header x-vulcain-publicpath ${publicPath}`);
-                this.backends.push("  reqrep ^([^\\ ]*)\\ " + publicPath + "([?\\#/].*)?   \\1\\ /" + rule.pathPrefix + "\\2");
-            }
-            else if (rule.path) { // means /
-                this.backends.push(`  http-request add-header x-vulcain-publicpath  /`);
-                this.backends.push("  reqrep ^([^\\ :]*)\\ /(.*)   \\1\\ /" + rule.pathPrefix + "\\2");
-            }
+        // Publicpath rewriting
+        if (rule.pathPrefix && publicPath) {
+            this.backends.push(`  http-request add-header x-vulcain-publicpath ${rule.path}`);
+            this.backends.push("  reqrep ^([^\\ :]*)\\ " + publicPath + "  \\1\\ /" + rule.pathPrefix + "\\2");
         }
 
         this.backends.push("  server " + serviceName + " " + rule.serviceName + ":" + (rule.servicePort || "8080"));

@@ -39,7 +39,7 @@ export class Server {
         app.post('/delete', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res, true));
         app.post('/restart', (req: express.Request, res: express.Response) => this.restart(req, res));
         app.get('/health', (req: express.Request, res: express.Response) => { res.end(); });
-        app.get('/infos', (req: express.Request, res: express.Response) => { this.showInfos(req.query.env, res); });
+        app.get('/status', (req: express.Request, res: express.Response) => { this.showInfos(req.query.env, res); });
     }
 
     start() {
@@ -139,9 +139,10 @@ export class Server {
 
         if (this.currentDefinition && this.currentDefinition.rules) {
             let tpl = new Template(this.proxyManager, this.currentDefinition);
-            await tpl.transform();
+            await tpl.apply();
             // Remove unused certificates
             util.log("Pruning certificates");
+            
             tpl.proxyManager.purge(this.currentDefinition.rules);
         }
         else {
@@ -155,7 +156,7 @@ export class Server {
     // -------------------------------------------------------------------
     private async updateConfiguration(req: express.Request, res: express.Response, removeRule: boolean) {
         try {
-            util.log("Updating configuration");
+            removeRule ? util.log("Removing rule from new request") : util.log("Updating configuration from new request");
             let def: IngressDefinition = req.body;
             if (def) {
                 this.initializeProxyFromConfiguration(def, removeRule);
@@ -268,9 +269,13 @@ export class Server {
         });
     }
 
-    private showInfos(env: string, res: express.Response) {
-        let tpl = new Template(this.proxyManager, <any>{ env });
-        let cfg = tpl.getCurrentHaproxyConfiguration();
-        res.send({ config: cfg }); // TODO log
+    private async showInfos(env: string, res: express.Response) {
+        if (this.currentDefinition) {
+            const tpl = new Template(this.proxyManager, this.currentDefinition);
+            res.send({ def: this.currentDefinition, proxy: await tpl.transform(true) }); // TODO log
+        }
+        else {
+            res.send({ def: "<no configuration>" });
+        }
     }
 }

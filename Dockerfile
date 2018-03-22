@@ -34,8 +34,4 @@ COPY assets/global.default assets/test.default /var/haproxy/
 COPY node_modules/ /app/node_modules
 COPY dist/src/ /app
 
-#RUN apt-get update && apt-get install -y rsyslog
-#COPY assets/rsyslog.conf /etc/rsyslog.d/haproxy.conf
-#ADD letsencrypt.tar /
-
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

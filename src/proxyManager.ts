@@ -106,7 +106,7 @@ export class ProxyManager {
                     return;
                 }
 
-                let domainNames = rules.filter(d=>d.tlsDomain).map(d => { let dn = d.tlsDomain.toLowerCase(); if (dn.startsWith("*.*")) dn = dn.substr(2); return dn; });
+                let domainNames = rules.filter(d=>d.tlsDomain).map(d => { let dn = d.tlsDomain.toLowerCase(); if (dn.startsWith("*.")) dn = dn.substr(2); return dn; });
 
                 for (const folder of folders) {
                     if (domainNames.find(d => d === folder.toLowerCase())) {
@@ -123,6 +123,7 @@ export class ProxyManager {
             let dn = domain;
             if (domain.startsWith("*."))
                 dn = domain.substr(2);
+
             fs.exists(Path.join(this.engine.certificatesFolder, dn), exists => {
                 if (!exists) {
                     this.engine.createCertificateAsync(domain, email)

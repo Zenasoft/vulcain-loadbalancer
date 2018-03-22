@@ -12,7 +12,6 @@
 			"args": [],
 			"cwd": "${workspaceRoot}",
 			"env": {
-				"MODE": "dry-run"
 			},
 			"console": "integratedTerminal",
 			"sourceMaps": true,

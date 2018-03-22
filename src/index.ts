@@ -21,6 +21,10 @@ const util = require('util');
 // -------------------------------------------------------------------
 util.log("vulcain load balancer - version 1.1.20");
 
+process.on('unhandledRejection', function(reason, p){
+    console.log("Unhandled Rejection at: Promise ", p, " reason: ", reason);
+});
+
 const engine = EngineFactory.createEngine();
 const server = new Server(engine);
 server.start();

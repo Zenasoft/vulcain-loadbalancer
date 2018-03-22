@@ -51,7 +51,7 @@ class MockEngine implements IEngine {
     public certificatesFolder: string;
 
     constructor() {
-        this.certificatesFolder = "./data/certificates";
+        this.certificatesFolder = "./data/etc/letsencrypt/live";
         shell.mkdir("-p", this.configurationsFolder);
     }
 
@@ -60,19 +60,19 @@ class MockEngine implements IEngine {
     }
 
     revokeCertificate(letsEncryptFolder: string, domain: string) {
-        util.log("Revoke certificate " + domain);
+        util.log("MOCK: Revoke certificate " + domain);
     }
 
     // -------------------------------------------------------------------
     // Function called when a process is started
     // -------------------------------------------------------------------
     processCommandAsync(command: string, message: string): Promise<any> {
-        util.log(`Running command ${command} - ${message}`);
+        util.log(`MOCK: Running command ${command} - ${message}`);
         return Promise.resolve(true);
     }
 
     createCertificateAsync(domain: string, email: string): Promise<any> {
-        util.log(`Create certificate for domain ${domain} --------------------------\n`);
+        util.log(`MOCK: Create certificate for domain ${domain} --------------------------\n`);
         return Promise.resolve(true);
     }
 }
