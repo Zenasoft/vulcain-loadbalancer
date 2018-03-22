@@ -32,6 +32,6 @@ RUN chmod +x /app/cert-creation.sh
 
 COPY assets/global.default assets/test.default /var/haproxy/
 COPY node_modules/ /app/node_modules
-COPY dist/src/ /app
+COPY dist/ /app
 
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

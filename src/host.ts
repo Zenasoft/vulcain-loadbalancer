@@ -90,17 +90,17 @@ class HostEngine implements IEngine {
 
             shell.exec(command, (error, stdout, stderr) => {
                 if (!error) {
-                    console.log(stderr);
-                    try {
-                        util.log("Remove domain folder");
-                        shell.rm("-rf", letsEncryptFolder + "/" + domain);
-                        shell.rm("-rf", letsEncryptFolder + "/../archive/" + domain);
-                        util.log("Remove domain renewal configuration");
-                        shell.rm(letsEncryptFolder + "/../renewal/" + domain + ".conf");
-                    }
-                    catch (e) {
-                        util.log(`Certificate revocation failed for domain ${domain}`);
-                    }
+                    console.log(stdout);
+                    util.log(`Delete additional certificate files for domain ${domain}`);
+                    shell.exec("certbot delete --cert-name " + domain, (error, stdout, stderr) => {
+                        if (!error) {
+                            console.log(stdout);
+                        }
+                        else {
+                            util.log(`Certificate deletion failed for domain ${domain}`);
+                        }
+                        resolve();
+                    });
                 }
                 else {
                     util.log(`Certificate revocation failed for domain ${domain}`);
@@ -138,13 +138,11 @@ class HostEngine implements IEngine {
             }
             childProcess.execFile("/app/cert-creation.sh", [domain, email], { cwd: "/app" }, (err, stdout, stderr) => {
                 if (err) {
-                    util.log(`Error when creating certificate for ${domain} - ${err}
-                    -----------------------\n`);
+                    util.log(`Error when creating certificate for ${domain} - ${err} -----------------------\n`);
                     reject();
                 }
                 else {
-                    util.log(`Certificate created for ${domain} ${stdout}
-                    ------------------------\n`);
+                    util.log(`Certificate created for ${domain} ${stdout} ------------------------\n`);
                     resolve();
                 }
             });

@@ -44,7 +44,7 @@ export class ProxyManager {
     }
 
     // -------------------------------------------------------------------
-    // combines all config file (one by env + default)
+    // combines all config file
     // -------------------------------------------------------------------
     private createConfigFileArguments() {
         const folder = this.engine.configurationsFolder;
@@ -106,7 +106,14 @@ export class ProxyManager {
                     return;
                 }
 
-                let domainNames = rules.filter(d=>d.tlsDomain).map(d => { let dn = d.tlsDomain.toLowerCase(); if (dn.startsWith("*.")) dn = dn.substr(2); return dn; });
+                let domainNames = rules
+                    .filter(d => d.tlsDomain)
+                    .map(d => {
+                        let dn = d.tlsDomain.toLowerCase();
+                        if (dn.startsWith("*."))
+                            dn = dn.substr(2);
+                        return dn;
+                    });
 
                 for (const folder of folders) {
                     if (domainNames.find(d => d === folder.toLowerCase())) {

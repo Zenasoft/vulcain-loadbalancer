@@ -12,11 +12,13 @@
 			"args": [],
 			"cwd": "${workspaceRoot}",
 			"env": {
+				"MODE":"dry-run",
+				"CONFIG_FILE": "test/services.yml"
 			},
 			"console": "integratedTerminal",
 			"sourceMaps": true,
 			"outFiles": [
-                "${workspaceRoot}/dist/src/**/*.js"
+                "${workspaceRoot}/dist/**/*.js"
             ]
 		},
 		{

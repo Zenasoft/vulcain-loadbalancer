@@ -1,6 +1,6 @@
 {
   "name": "vulcain.loadbalancer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Vulcain load balancer",
   "main": "src/index.ts",
   "private": true,

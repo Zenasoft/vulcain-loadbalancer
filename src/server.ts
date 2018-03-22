@@ -19,7 +19,7 @@ const bodyParser = require('body-parser');
 import { Template } from './template';
 import * as http from 'http';
 import { ProxyManager } from './proxyManager';
-import { IngressDefinition, CONTEXT } from './model';
+import { IngressDefinition, CONTEXT, RuleDefinition } from './model';
 import { IEngine } from './host';
 const app = express();
 const YAML = require('yamljs');
@@ -49,8 +49,9 @@ export class Server {
         else if (CONTEXT.isDryRun()) {
             util.log("*** Running in dry-run mode ***");
         }
+
         // Start server
-        app.listen(29000, (err) => {
+        app.listen(29000, async (err) => {
             if (err) {
                 util.log(err);
                 process.exit(1);
@@ -61,15 +62,14 @@ export class Server {
 
             // When server is initialized, run haproxy with initial configuration
             //
-            this.proxyManager
-                .startProxy()
-                .then(() => {
-                    setTimeout(this.initialize.bind(this), 2000); // waiting for haproxy running
-                })
-                .catch(err => {
-                    util.log(err);
-                    process.exit(1);
-                });
+            try {
+                await this.proxyManager.startProxy();
+                setTimeout(this.initialize.bind(this), 2000); // waiting for haproxy running
+            }
+            catch (err) {
+                util.log(err);
+                process.exit(1);
+            }
         });
     }
 
@@ -78,75 +78,119 @@ export class Server {
      * Get initial configuration from local file or remote server (see bootstrapAsync) and
      *  create a new haproxy config file before starting it
      */
-    private initialize() {
-        this.bootstrapAsync().then(async (result: any) => {
-            if (!result) {
-                return;
+    private async initialize() {
+        let result:any = await this.bootstrapAsync();
+
+        if (!result) {
+            return;
+        }
+
+        let error = result.error;
+        if (!error) {
+            if (result.status / 100 > 2) {
+                error = result.data;
             }
-            let error = result.error;
-            if (!error) {
-                if (result.status / 100 > 2) {
-                    error = result.data;
-                }
-                else {
-                    let def: IngressDefinition = result.def;
+            else {
+                let def: IngressDefinition = result.def;
+                try {
                     await this.initializeProxyFromConfiguration(def);
                 }
+                catch (e) {
+                    error = e.message;
+                }
             }
-            if (error) {
-                util.log("Error on bootstrap " + error);
-            }
-        });
+        }
+
+        if (error) {
+            util.log("Error on bootstrap " + error + ". Initial configuration is ignored.");
+        }
     }
 
-    private async initializeProxyFromConfiguration(def: IngressDefinition, removeRule=false) {
-        if (!this.currentDefinition || !def) {
-            this.currentDefinition = def;
-        } else {
-            if (!this.currentDefinition)
-                this.currentDefinition = <any>{};
+    private validateRule(rule: RuleDefinition, removeAction: boolean) {
+        if (!rule.id) {
+            throw new Error("id is required for rules");
+        }
+        if (removeAction)
+            return;
 
-            // Merge with current
-            Object.keys(def).forEach(key => {
-                let value = def[key];
-                if (key === "rules") {
-                    let list = this.currentDefinition.rules || [];
-                    for (const rule of value) {
-                        let oldIndex = list.findIndex(r => r.serviceName === rule.serviceName);
-                        if (!removeRule) {
-                            let v = { ...list[oldIndex], ...rule };
-                            if (oldIndex < 0) {
-                                list.push(v);
+        if (rule.tlsDomain && !this.currentDefinition.tlsEmail)
+            throw new Error("tlsEmail is required for let's encrypt certificate creation");
+
+        if (!rule.hostName && rule.tlsDomain && !rule.tlsDomain.startsWith("*.")) {
+            rule.hostName = rule.tlsDomain;
+        }
+        if (!rule.hostName && !rule.path) {
+            throw new Error(`Rule ${rule.id} either hostName or path must be set`);
+        }
+        if (!rule.serviceName) {
+            throw new Error(`Rule ${rule.id} serviceName is required`);
+        }
+    }
+
+    private async initializeProxyFromConfiguration(def: IngressDefinition, removeRule = false) {
+        let old = this.currentDefinition;
+        try {
+            if (!this.currentDefinition || !def) {
+                this.currentDefinition = def;
+                def && def.rules && def.rules.forEach(r => this.validateRule(r, false));
+            }
+            else {
+                if (!this.currentDefinition)
+                    this.currentDefinition = <any>{};
+
+                // Merge with current
+                Object.keys(def).forEach(key => {
+                    let value = def[key];
+                    if (key === "rules") {
+                        let list = this.currentDefinition.rules || [];
+                        for (const rule of value) {
+                            // Validation
+                            this.validateRule(rule, removeRule);
+
+                            let oldIndex = list.findIndex(r => r.id === rule.id);
+                            if (!removeRule) {
+                                if (oldIndex < 0) {
+                                    util.log('Rule ' + list[oldIndex].id + ' added');
+                                    list.push(rule);
+                                }
+                                else {
+                                    let v = { ...list[oldIndex], ...rule };
+                                    util.log('Rule ' + list[oldIndex].id + ' updated.');
+                                    list[oldIndex] = v;
+                                }
                             }
-                            else {
-                                list[oldIndex] = v;
+                            else if (oldIndex >= 0) { // remove
+                                util.log('Rule ' + list[oldIndex].id + ' removed');
+                                list.splice(oldIndex);
                             }
                         }
-                        else if (oldIndex >= 0) {
-                            list.splice(oldIndex);
-                        }
+                        value = list;
                     }
-                    value = list;
-                }
-                else if (removeRule) {
-                    // Only remove rule
-                    return;
-                }
+                    else if (removeRule) {
+                        // Only remove rule
+                        return;
+                    }
 
-                this.currentDefinition[key] = value;
-            });
-        }
+                    this.currentDefinition[key] = value;
+                });
+            }
 
-        if (this.currentDefinition && this.currentDefinition.rules) {
-            let tpl = new Template(this.proxyManager, this.currentDefinition);
-            await tpl.apply();
-            // Remove unused certificates
-            util.log("Pruning certificates");
-            
-            tpl.proxyManager.purge(this.currentDefinition.rules);
+            if (this.currentDefinition && this.currentDefinition.rules) {
+                let tpl = new Template(this.proxyManager, this.currentDefinition);
+                await tpl.apply();
+
+                // Remove unused certificates
+                util.log("Pruning certificates");
+                tpl.proxyManager.purge(this.currentDefinition.rules);
+            }
+            else {
+                util.log("No configuration founded. Waiting for new configuration ...");
+            }
         }
-        else {
-            util.log("No configuration founded. Waiting for new configuration ...");
+        catch (e) {
+            util.log('Error occurs. Rollback configuration.');
+            this.currentDefinition = old;
+            throw e;
         }
     }
 
@@ -156,14 +200,20 @@ export class Server {
     // -------------------------------------------------------------------
     private async updateConfiguration(req: express.Request, res: express.Response, removeRule: boolean) {
         try {
-            removeRule ? util.log("Removing rule from new request") : util.log("Updating configuration from new request");
+            removeRule ? util.log("Removing rule from api request") : util.log("Updating configuration from api request");
+
             let def: IngressDefinition = req.body;
             if (def) {
-                this.initializeProxyFromConfiguration(def, removeRule);
-                res.end("OK");
+                try {
+                    await this.initializeProxyFromConfiguration(def, removeRule);
+                    res.end("OK");
+                }
+                catch (e) {
+                    res.status(400).end(e.message);
+                }
             }
             else {
-                util.log("Error: empty config");
+                util.log("Error: Empty configuration.");
                 res.status(400).end();
             }
         }
@@ -177,7 +227,7 @@ export class Server {
     // Restart haproxy with the same configuration (from api)
     // -------------------------------------------------------------------
     private restart(req: express.Request, res: express.Response) {
-        util.log("Restarting haproxy");
+        util.log("Restarting haproxy...");
         this.proxyManager.restart();
         res.end();
     }
@@ -192,6 +242,7 @@ export class Server {
         var fn = process.env["CONFIG_FILE"] || "/etc/vulcain/services.yaml";
         if (fs.existsSync(fn)) {
             try {
+                util.log("Loading configuration file from " + fn);
                 services = YAML.parse(fs.readFileSync(fn, 'utf8'));
             }
             catch (e) {
@@ -205,15 +256,15 @@ export class Server {
             return Promise.resolve({ def: services });
         }
 
-        return this.getVulcainConfigurations(vulcainAddress, services);
+        return this.getConfigurationFromVulcainServer(vulcainAddress, services);
     }
 
-    private getVulcainConfigurations(vulcainAddress: string, services: any) {
+    private getConfigurationFromVulcainServer(vulcainAddress: string, services: any) {
 
         let env = process.env.VULCAIN_ENV;
         let token = process.env.VULCAIN_TOKEN;
         if (!token) {
-            util.log("ERROR: You must provided a token.");
+            util.log("ERROR: Token is required for getting configuration from vulcain server.");
             process.exit(1);
         }
 
@@ -272,7 +323,7 @@ export class Server {
     private async showInfos(env: string, res: express.Response) {
         if (this.currentDefinition) {
             const tpl = new Template(this.proxyManager, this.currentDefinition);
-            res.send({ def: this.currentDefinition, proxy: await tpl.transform(true) }); // TODO log
+            res.send({ def: this.currentDefinition, proxy: await tpl.transform(true) });
         }
         else {
             res.send({ def: "<no configuration>" });

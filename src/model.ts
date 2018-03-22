@@ -9,6 +9,10 @@ export class CONTEXT {
  */
 export interface RuleDefinition {
     /**
+     * Unique id
+     */
+    id: string;
+    /**
      * tenant name - If not provide ServiceDefinitions.defaultTenantPattern must be provided
      * Used to force a tenant
      */
@@ -47,10 +51,6 @@ export interface RuleDefinition {
  * Service list for an environment
  */
 export interface IngressDefinition {
-    /**
-     * Name
-     */
-    env?: string;
     /**
      * Let's encrypt expiration email
      */
