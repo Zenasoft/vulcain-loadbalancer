@@ -160,10 +160,10 @@ export class Template {
                 cx++;
                 let domainName = rule.hostName;
                 let acl = acls[domainName] || cx;
-                if (domainName)
-                    acls[domainName] = acl;
 
                 if (rule.hostName) {
+                    acls[domainName] = acl;
+
                     this.frontends.push("  # " + rule.hostName);
                     this.frontends.push("  acl acl_" + acl + " hdr(host) -i " + domainName);
 

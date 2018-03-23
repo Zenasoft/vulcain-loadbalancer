@@ -12,6 +12,7 @@
 //
 //    Copyright (c) Zenasoft
 //
+const path = require('path');
 const util = require('util');
 import * as fs from 'fs';
 import * as express from 'express';
@@ -21,11 +22,13 @@ import * as http from 'http';
 import { ProxyManager } from './proxyManager';
 import { IngressDefinition, CONTEXT, RuleDefinition } from './model';
 import { IEngine } from './host';
+import { KubernetesWatcher, IWatcher } from './watcher';
 const app = express();
 const YAML = require('yamljs');
 
 export class Server {
 
+    private watcher: IWatcher;
     private proxyManager: ProxyManager;
     private currentDefinition: IngressDefinition;
 
@@ -104,6 +107,20 @@ export class Server {
         if (error) {
             util.log("Error on bootstrap '" + error + "'. Initial configuration is ignored.");
         }
+
+        let configFile = process.env["KUBERNETES_CONFIG_FILE"];
+        if (configFile) {
+            if (!path.isAbsolute(configFile))
+            configFile = path.join(process.env['HOME'] || process.env['USERPROFILE'], configFile);
+
+            try {
+                this.watcher = new KubernetesWatcher(this);
+                this.watcher.run(configFile);
+            }
+            catch (e) {
+                util.log(`Unable to start kubernetes watcher. ${e.message}`);
+            }
+        }
     }
 
     private validateRule(rule: RuleDefinition, removeAction: boolean) {
@@ -127,12 +144,14 @@ export class Server {
         }
     }
 
-    private async initializeProxyFromConfiguration(def: IngressDefinition, removeRule = false) {
+    async initializeProxyFromConfiguration(def: IngressDefinition, removeRule = false) {
         let old = this.currentDefinition;
         try {
             if (!this.currentDefinition || !def) {
-                this.currentDefinition = def;
-                def && def.rules && def.rules.forEach(r => this.validateRule(r, false));
+                if (!removeRule) {
+                    this.currentDefinition = def;
+                    def && def.rules && def.rules.forEach(r => this.validateRule(r, false));
+                }
             }
             else {
                 if (!this.currentDefinition)
@@ -150,17 +169,17 @@ export class Server {
                             let oldIndex = list.findIndex(r => r.id === rule.id);
                             if (!removeRule) {
                                 if (oldIndex < 0) {
-                                    util.log('Rule ' + list[oldIndex].id + ' added');
+                                    util.log('Rule ' + rule.id + ' added');
                                     list.push(rule);
                                 }
                                 else {
                                     let v = { ...list[oldIndex], ...rule };
-                                    util.log('Rule ' + list[oldIndex].id + ' updated.');
+                                    util.log('Rule ' + rule.id + ' updated.');
                                     list[oldIndex] = v;
                                 }
                             }
                             else if (oldIndex >= 0) { // remove
-                                util.log('Rule ' + list[oldIndex].id + ' removed');
+                                util.log('Rule ' + rule.id + ' removed');
                                 list.splice(oldIndex);
                             }
                         }
@@ -200,7 +219,7 @@ export class Server {
     // -------------------------------------------------------------------
     private async updateConfiguration(req: express.Request, res: express.Response, removeRule: boolean) {
         try {
-            removeRule ? util.log("Removing rule from api request") : util.log("Updating configuration from api request");
+            removeRule ? util.log("Removing rule from api request") : util.log("Updating rule from api request");
 
             let def: IngressDefinition = req.body;
             if (def) {

@@ -83,7 +83,7 @@ class HostEngine implements IEngine {
     public configurationsFolder = "/var/haproxy";
 
     revokeCertificate(letsEncryptFolder: string, domain: string) {
-        const command = `certbot revoke -t -n --cert-path ${letsEncryptFolder}/${domain}/haproxy.pem`;
+        const command = `certbot revoke -t -n --agree-tos --cert-path ${letsEncryptFolder}/${domain}/haproxy.pem`; // TODO add --email
         util.log("Running command " + command);
 
         return new Promise((resolve, reject) => {

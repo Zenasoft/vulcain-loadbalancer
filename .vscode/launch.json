@@ -13,7 +13,8 @@
 			"cwd": "${workspaceRoot}",
 			"env": {
 				"MODE":"dry-run",
-				"CONFIG_FILE": "test/services.yml"
+				"CONFIG_FILE": "test/services.yml",
+				"KUBERNETES_CONFIG_FILE": ".kube/mix-cluster-config"
 			},
 			"console": "integratedTerminal",
 			"sourceMaps": true,

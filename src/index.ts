@@ -15,14 +15,13 @@ import { EngineFactory } from './host';
 //    Copyright (c) Zenasoft
 //
 const util = require('util');
-const pkg = require('../package.json');
 
 // -------------------------------------------------------------------
 // START
 // -------------------------------------------------------------------
-util.log("Vulcain load balancer - version " + pkg.version);
+util.log("Vulcain load balancer - version 2.0.0");
 
-process.on('unhandledRejection', function(reason, p){
+process.on('unhandledRejection', function (reason, p) {
     console.log("Unhandled rejection at: Promise ", p, " reason: ", reason);
 });
 
