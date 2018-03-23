@@ -8,18 +8,21 @@ tlsEmail: admin@mydomain.com # (optional). Domain administrator email
 
 rules:
   - hostName: customer1.mydomain.com # Required
+    id: "1"
     tlsDomain: "*.mydomain.com"
     tenant: customer1 # Optional if not set defaultTenantPattern is used to resolve tenant name and set x-vulcain-tenant header
     serviceName: service1
     servicePort: 80 # optional default to 8080
   - hostName: api.mydomain.com
+    id: "2"
     tlsDomain: "*.mydomain.com"
     serviceName: hopex-admin-10
     servicePort: 8080
     tenant: vulcain
-    path: /public # optional - Filter only request where path begins with /public ignore all others
-    pathPrefix: /api # optional - replace publicpath with prefixpath
+    path: /public/ # optional - Filter only request where path begins with /public ignore all others
+    pathRewrite: /api/ # optional - replace path with it
   - hostName: admin.mydomain.com
+    id: "3"
     tlsDomain: "*.mydomain.com"
     serviceName: hopex-ui-10
     servicePort: 80

@@ -36,7 +36,7 @@ export interface RuleDefinition {
      *   publicPath = /v1/customer.all
      *   target service path = /api/customer.all
      */
-    pathPrefix?: string;
+    pathRewrite?: string;
     /**
      * Service name (dns)
      */

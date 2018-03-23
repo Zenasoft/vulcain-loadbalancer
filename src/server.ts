@@ -79,7 +79,7 @@ export class Server {
      *  create a new haproxy config file before starting it
      */
     private async initialize() {
-        let result:any = await this.bootstrapAsync();
+        let result: any = await this.bootstrapAsync();
 
         if (!result) {
             return;
@@ -102,7 +102,7 @@ export class Server {
         }
 
         if (error) {
-            util.log("Error on bootstrap " + error + ". Initial configuration is ignored.");
+            util.log("Error on bootstrap '" + error + "'. Initial configuration is ignored.");
         }
     }
 
@@ -188,7 +188,7 @@ export class Server {
             }
         }
         catch (e) {
-            util.log('Error occurs. Rollback configuration.');
+            util.log(`Error occurs. Rollback configuration.`);
             this.currentDefinition = old;
             throw e;
         }

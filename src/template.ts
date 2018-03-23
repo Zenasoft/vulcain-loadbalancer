@@ -188,22 +188,24 @@ export class Template {
         let backend = "backend_" + serviceName;
         let aclIf = rule.hostName ? " if acl_" + index : " if";
 
-        let publicPath: string;
+        let path: string;
         if (rule.path) {
             if (rule.path === '/') {
-                publicPath = "/(.*)?$"
+                path = "/(.*)?$"
             }
             else {
                 if (rule.path[0] !== '/') {
-                    publicPath = `/${rule.path}([?\\#/].*)?$`;
+                    path = `/${this.normalizeRegex(rule.path)}(.*)?$`;
                 }
                 else {
-                    publicPath = `${rule.path}([?\\#/].*)?$`;
+                    path = `${this.normalizeRegex(rule.path)}(.*)?$`;
                 }
             }
+            if (path[0] === "^")
+                path = path.substr(1);
 
             let acl = backend + "_public_acl";
-            this.frontends.push("  acl " + acl + " path_reg ^" + publicPath);
+            this.frontends.push("  acl " + acl + " path_reg ^" + path);
             aclIf = aclIf + " " + acl;
         }
 
@@ -218,12 +220,27 @@ export class Template {
         this.backends.push("  http-request add-header X-Forwarded-Proto https if { ssl_fc }");
         this.backends.push("  mode http");
 
-        // Publicpath rewriting
-        if (rule.pathPrefix && publicPath) {
+        // Path rewriting
+        if (rule.pathRewrite && path) {
             this.backends.push(`  http-request add-header x-vulcain-publicpath ${rule.path}`);
-            this.backends.push("  reqrep ^([^\\ :]*)\\ " + publicPath + "  \\1\\ /" + rule.pathPrefix + "\\2");
+            let rw = rule.pathRewrite;
+            let parts = rw.split(':');
+            if (parts.length === 1) {
+                // Replace path by pathRewrite
+                this.backends.push("  reqrep ^([^\\ :]*)\\ " + path + "  \\1\\ " + rw + "\\2");
+            } else if (parts.length === 2) {
+                this.backends.push("  reqrep ^([^\\ :]*)\\ " + this.normalizeRegex(parts[0]) + "  \\1\\ " + this.normalizeRegex(parts[1]));
+            }
+            else {
+                util.log(`Malformed rewriting path ${rw} is ignored for rule ${rule.id}`);
+            }
         }
 
         this.backends.push("  server " + serviceName + " " + rule.serviceName + ":" + (rule.servicePort || "8080"));
+    }
+
+    private normalizeRegex(str: string): string {
+        return str.replace(/\\\//g, '/')
+                  .replace(/\$(\d+)/g, (s, x)=> String(+x + 1)); // $x -> \\(x+1)
     }
 }
