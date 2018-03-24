@@ -12,7 +12,6 @@
 //
 //    Copyright (c) Zenasoft
 //
-const path = require('path');
 const util = require('util');
 import * as fs from 'fs';
 import * as express from 'express';
@@ -27,7 +26,6 @@ const app = express();
 const YAML = require('yamljs');
 
 export class Server {
-
     private watcher: IWatcher;
     private proxyManager: ProxyManager;
     private currentDefinition: IngressDefinition;
@@ -41,7 +39,8 @@ export class Server {
         app.post('/update', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res, false));
         app.post('/delete', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res, true));
         app.post('/restart', (req: express.Request, res: express.Response) => this.restart(req, res));
-        app.get('/health', (req: express.Request, res: express.Response) => { res.end(); });
+        
+        app.get('/healthz', (req: express.Request, res: express.Response) => { res.end(); });
         app.get('/status', (req: express.Request, res: express.Response) => { this.showInfos(req.query.env, res); });
     }
 
@@ -108,19 +107,7 @@ export class Server {
             util.log("Error on bootstrap '" + error + "'. Initial configuration is ignored.");
         }
 
-        let configFile = process.env["KUBERNETES_CONFIG_FILE"];
-        if (configFile) {
-            if (!path.isAbsolute(configFile))
-            configFile = path.join(process.env['HOME'] || process.env['USERPROFILE'], configFile);
-
-            try {
-                this.watcher = new KubernetesWatcher(this);
-                this.watcher.run(configFile);
-            }
-            catch (e) {
-                util.log(`Unable to start kubernetes watcher. ${e.message}`);
-            }
-        }
+        this.watcher = KubernetesWatcher.create(this);
     }
 
     private validateRule(rule: RuleDefinition, removeAction: boolean) {
@@ -130,18 +117,39 @@ export class Server {
         if (removeAction)
             return;
 
+        if (rule.tlsDomain && rule.tlsDomain.startsWith("*."))
+            throw new Error(`Rule ${rule.id} wildcard domain is not allowed into a rule.`);
+
         if (rule.tlsDomain && !this.currentDefinition.tlsEmail)
             throw new Error("tlsEmail is required for let's encrypt certificate creation");
 
-        if (!rule.hostName && rule.tlsDomain && !rule.tlsDomain.startsWith("*.")) {
+        if (!rule.hostName && rule.tlsDomain) {
             rule.hostName = rule.tlsDomain;
         }
+
         if (!rule.hostName && !rule.path) {
             throw new Error(`Rule ${rule.id} either hostName or path must be set`);
         }
+
         if (!rule.serviceName) {
             throw new Error(`Rule ${rule.id} serviceName is required`);
         }
+
+        // if tlsDomain is a sub domain, ignore it
+        if (rule.tlsDomain &&
+            this.currentDefinition.wildcardDomains.findIndex(wd => rule.tlsDomain.endsWith("." + wd)) >= 0) {
+            rule.tlsDomain = null;
+        }
+
+        if (rule.tlsDomain)
+            rule.tlsDomain = rule.tlsDomain.toLowerCase();
+    }
+
+    private validateWildcardDomains(def: IngressDefinition) {
+        if (!def.wildcardDomains)
+            def.wildcardDomains = [];
+        else
+            def.wildcardDomains = def.wildcardDomains.map(wd => (wd.startsWith("*.") ? wd.substr(2) : wd).toLowerCase());
     }
 
     async initializeProxyFromConfiguration(def: IngressDefinition, removeRule = false) {
@@ -150,12 +158,17 @@ export class Server {
             if (!this.currentDefinition || !def) {
                 if (!removeRule) {
                     this.currentDefinition = def;
-                    def && def.rules && def.rules.forEach(r => this.validateRule(r, false));
+                    if (def) {
+                        this.validateWildcardDomains(def);
+                        def.rules && def.rules.forEach(r => this.validateRule(r, false));
+                    }
                 }
             }
             else {
                 if (!this.currentDefinition)
                     this.currentDefinition = <any>{};
+
+                this.validateWildcardDomains(def);
 
                 // Merge with current
                 Object.keys(def).forEach(key => {
@@ -200,7 +213,7 @@ export class Server {
 
                 // Remove unused certificates
                 util.log("Pruning certificates");
-                tpl.proxyManager.purge(this.currentDefinition.rules);
+                tpl.proxyManager.purge(this.currentDefinition);
             }
             else {
                 util.log("No configuration founded. Waiting for new configuration ...");

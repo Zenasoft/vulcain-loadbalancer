@@ -22,7 +22,7 @@ WORKDIR /app
 
 COPY assets/supervisord.conf /etc/supervisord.conf
 
-# all week (useless since cerbot provides this functionality)
+# cron job for renewal (useless since cerbot provides this functionality)
 #RUN echo "0 0 * * 0 /app/cert-renewal.sh >> /var/log/renew.log 2>&1" | crontab -
 #COPY assets/cert-renewal.sh /app/cert-renewal.sh
 #RUN chmod +x /app/cert-renewal.sh

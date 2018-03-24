@@ -4,18 +4,18 @@
 env: test
 defaultTenantPattern: (/w*)\.mydomain.com # default. Used to set x-vulcain-tenant header
 tlsEmail: admin@mydomain.com # (optional). Domain administrator email
+wildcardDomains: ["mydomain.com"]
 # End optionals
 
 rules:
-  - hostName: customer1.mydomain.com # Required
+  - hostName: customer1.mydomain.com 
     id: "1"
-    tlsDomain: "*.mydomain.com"
     tenant: customer1 # Optional if not set defaultTenantPattern is used to resolve tenant name and set x-vulcain-tenant header
     serviceName: service1
     servicePort: 80 # optional default to 8080
+    tlsDomain: customer1.mydomain.com
   - hostName: api.mydomain.com
     id: "2"
-    tlsDomain: "*.mydomain.com"
     serviceName: hopex-admin-10
     servicePort: 8080
     tenant: vulcain
@@ -23,7 +23,6 @@ rules:
     pathRewrite: /api/ # optional - replace path with it
   - hostName: admin.mydomain.com
     id: "3"
-    tlsDomain: "*.mydomain.com"
     serviceName: hopex-ui-10
     servicePort: 80
     tenant: vulcain

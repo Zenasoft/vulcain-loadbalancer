@@ -12,7 +12,7 @@
 //
 //    Copyright (c) Zenasoft
 //
-import { RuleDefinition, CONTEXT } from './model';
+import { RuleDefinition, CONTEXT, IngressDefinition } from './model';
 import { IEngine } from './host';
 const util = require('util');
 const fs = require('fs');
@@ -95,7 +95,10 @@ export class ProxyManager {
         }
     }
 
-    purge(rules: Array<RuleDefinition>) {
+    purge(def: IngressDefinition) {
+        if (!def || !def.rules)
+            return;
+
         fs.exists(this.engine.certificatesFolder, exists => {
             if (!exists) {
                 return;
@@ -106,20 +109,17 @@ export class ProxyManager {
                     return;
                 }
 
-                let domainNames = rules
-                    .filter(d => d.tlsDomain)
-                    .map(d => {
-                        let dn = d.tlsDomain.toLowerCase();
-                        if (dn.startsWith("*."))
-                            dn = dn.substr(2);
-                        return dn;
-                    });
+                let activeDomains =
+                    def.rules.filter(d => d.tlsDomain).map(d => d.tlsDomain)
+                    // Do not revoke a wildcard domain
+                    .concat(def.wildcardDomains);
 
-                for (const folder of folders) {
-                    if (domainNames.find(d => d === folder.toLowerCase())) {
+                for (let folder of folders) {
+                    if (activeDomains.find(d => d === folder)) {
                         continue;
                     }
-                    this.engine.revokeCertificate(this.engine.certificatesFolder, folder);
+
+                    this.engine.revokeCertificate(def.tlsEmail, this.engine.certificatesFolder, folder);
                 }
             });
         });
@@ -127,11 +127,7 @@ export class ProxyManager {
 
     createCertificate(domain: string, email: string) {
         return new Promise((resolve, reject) => {
-            let dn = domain;
-            if (domain.startsWith("*."))
-                dn = domain.substr(2);
-
-            fs.exists(Path.join(this.engine.certificatesFolder, dn), exists => {
+            fs.exists(Path.join(this.engine.certificatesFolder, domain), exists => {
                 if (!exists) {
                     this.engine.createCertificateAsync(domain, email)
                         .then(resolve)

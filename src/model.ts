@@ -5,63 +5,69 @@ export class CONTEXT {
 }
 
 /**
- * Tenant definition
+ * Rule definition
  */
 export interface RuleDefinition {
     /**
-     * Unique id
+     * Unique id (Required)
      */
     id: string;
     /**
-     * tenant name - If not provide ServiceDefinitions.defaultTenantPattern must be provided
-     * Used to force a tenant
+     * tenant name :  force a tenant - If not provided, ServiceDefinitions.defaultTenantPattern is used
      */
     tenant?: string;
     /**
-     * Host name
+     * Host name (Optional), if not provided it will be initialized with tlsDomain
      */
     hostName: string;
     /**
-     * Domain name - A let's encrypt certificate will be created
+     * Domain name (Optional) - A let's encrypt certificate will be created
+     * Must be precise only if this is not a wildcards sub domain.
+     * Certificate will be revoked in case of rule deletion
      */
     tlsDomain?: string;
     /**
-     * Public path - overrided by pathPrefix in service endpoint if any
-     *
+     * Path filter (starts with)
+     * Optional, if empty hostname is required.
+     * Can also be a haproxy regular expression (see https://www.haproxy.com/fr/documentation/aloha/7-0/traffic-management/lb-layer7/http-rewrite/#rewrite-anywhere)
      */
     path?: string;
     /**
-     * Replace public path prefix with this value (default is api)
-     * ex: if pathPrefix = api
-     *   publicPath = /v1/customer.all
-     *   target service path = /api/customer.all
+     * Path rewriting (Optional), replace 'path' with.
+     * Can be a haproxy regular expression (see https://www.haproxy.com/fr/documentation/aloha/7-0/traffic-management/lb-layer7/http-rewrite/#rewrite-anywhere)
      */
     pathRewrite?: string;
     /**
-     * Service name (dns)
+     * Service name (dns host) - Required
      */
     serviceName: string;
     /**
-     * Exposed port service - Default 8080
+     * Exposed port service - Default to 8080
      */
     servicePort?: number;
 }
 
 /**
- * Service list for an environment
+ * Rules configuration
  */
 export interface IngressDefinition {
     /**
      * Let's encrypt expiration email
+     * Required for certificate creation
      */
     tlsEmail?: string;
     /**
+     * Wildcard domains (eg. mydomain.com) list.
+     * Certificates must be created manually and copied in /etc/letsencrypt
+     */
+    wildcardDomains?: string[];
+    /**
      * Regex pattern to resolve tenant from uri host name (optional)
-     * Used to set x-vulcain-tenant header if no tenant.name is provided
+     * Used to set x-vulcain-tenant header, if no rule.tenant is provided
      */
     defaultTenantPattern?: string;
     /**
-     * Rules
+     * Rule list
      */
     rules: Array<RuleDefinition>;
 }

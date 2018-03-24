@@ -24,7 +24,7 @@ export interface IEngine {
      *
      * @memberOf IEngine
      */
-    revokeCertificate(letsEncryptFolder: string, domain: string);
+    revokeCertificate(email: string, letsEncryptFolder: string, domain: string);
     /**
      * Execute a command
      *
@@ -59,7 +59,7 @@ class MockEngine implements IEngine {
         return "./data/config"
     }
 
-    revokeCertificate(letsEncryptFolder: string, domain: string) {
+    revokeCertificate(email: string, letsEncryptFolder: string, domain: string) {
         util.log("MOCK: Revoke certificate " + domain);
     }
 
@@ -82,8 +82,8 @@ class HostEngine implements IEngine {
     public certificatesFolder = "/etc/letsencrypt/live";
     public configurationsFolder = "/var/haproxy";
 
-    revokeCertificate(letsEncryptFolder: string, domain: string) {
-        const command = `certbot revoke -t -n --agree-tos --cert-path ${letsEncryptFolder}/${domain}/haproxy.pem`; // TODO add --email
+    revokeCertificate(email: string, letsEncryptFolder: string, domain: string) {
+        const command = `certbot revoke -t -n --agree-tos --email ${email} --cert-path ${letsEncryptFolder}/${domain}/haproxy.pem`;
         util.log("Running command " + command);
 
         return new Promise((resolve, reject) => {
