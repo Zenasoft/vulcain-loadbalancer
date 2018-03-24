@@ -19,7 +19,7 @@ export interface RuleDefinition {
     /**
      * Host name (Optional), if not provided it will be initialized with tlsDomain
      */
-    hostName: string;
+    hostname?: string;
     /**
      * Domain name (Optional) - A let's encrypt certificate will be created
      * Must be precise only if this is not a wildcards sub domain.

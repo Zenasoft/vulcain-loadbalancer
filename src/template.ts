@@ -159,12 +159,12 @@ export class Template {
         if (this.def.rules) {
             for (const rule of this.def.rules) {
                 cx++;
-                let domainName = rule.hostName;
+                let domainName = rule.hostname;
                 let aclIf = "if ";
 
                 // Filter by hostname
                 if (domainName) {
-                    this.frontends.push("  # " + rule.hostName);
+                    this.frontends.push("  # " + rule.hostname);
                     this.frontends.push("  acl acl_" + cx + " hdr(host) -i " + domainName);
                     aclIf = " if acl_" + cx;
                 }

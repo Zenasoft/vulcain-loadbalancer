@@ -2,6 +2,7 @@ const util = require('util');
 import * as childProcess from 'child_process';
 import * as shell from 'shelljs';
 import { CONTEXT } from './model';
+import * as Path from 'path';
 
 /**
  * Host interaction
@@ -78,16 +79,35 @@ class MockEngine implements IEngine {
 }
 
 class HostEngine implements IEngine {
-
     public certificatesFolder = "/etc/letsencrypt/live";
     public configurationsFolder = "/var/haproxy";
 
+    /**
+     * Simulate a semaphore between instances sharing volume data.
+     * Use mkdir because it is an atomic operation on linux
+     */
+    private lock(semaphore: string) {
+        let lockFile = Path.join(this.certificatesFolder, "." + semaphore + "_lock");
+        shell.mkdir(lockFile);
+        return shell.error() == null;
+    }
+
+    private unlock(semaphore: string) {
+        let lockFile = Path.join(this.certificatesFolder, "." + semaphore + "_lock");
+        shell.rmd("-f", lockFile);
+    }
+
     revokeCertificate(email: string, letsEncryptFolder: string, domain: string) {
+        let semaphore = domain + "_revoke";
+        if (!this.lock(semaphore)) {
+            util.log("Skipping revoke certificate. Revoke process already running for domain " + domain)
+            return;
+        }
+
         const command = `certbot revoke -t -n --agree-tos --email ${email} --cert-path ${letsEncryptFolder}/${domain}/haproxy.pem`;
         util.log("Running command " + command);
 
         return new Promise((resolve, reject) => {
-
             shell.exec(command, (error, stdout, stderr) => {
                 if (!error) {
                     console.log(stdout);
@@ -99,14 +119,16 @@ class HostEngine implements IEngine {
                         else {
                             util.log(`Certificate deletion failed for domain ${domain}`);
                         }
+                        this.unlock(semaphore);
                         resolve();
                     });
                 }
                 else {
                     util.log(`Certificate revocation failed for domain ${domain}`);
                     console.log(stderr);
+                    this.unlock(semaphore);
+                    resolve();
                 }
-                resolve();
             });
         });
     }
@@ -131,6 +153,11 @@ class HostEngine implements IEngine {
     }
 
     createCertificateAsync(domain: string, email: string): Promise<any> {
+        if (!this.lock(domain)) {
+            util.log("Skipping certificate creation. Creation process already running for domain " + domain)
+            return;
+        }
+
         util.log("Creating certificate for domain " + domain);
         return new Promise((resolve, reject) => {
             if (!email) {
@@ -139,10 +166,12 @@ class HostEngine implements IEngine {
             childProcess.execFile("/app/cert-creation.sh", [domain, email], { cwd: "/app" }, (err, stdout, stderr) => {
                 if (err) {
                     util.log(`Error when creating certificate for ${domain} - ${err} -----------------------\n`);
+                    this.unlock(domain);
                     reject();
                 }
                 else {
                     util.log(`Certificate created for ${domain} ${stdout} ------------------------\n`);
+                    this.unlock(domain);
                     resolve();
                 }
             });

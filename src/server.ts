@@ -39,7 +39,7 @@ export class Server {
         app.post('/update', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res, false));
         app.post('/delete', (req: express.Request, res: express.Response) => this.updateConfiguration(req, res, true));
         app.post('/restart', (req: express.Request, res: express.Response) => this.restart(req, res));
-        
+
         app.get('/healthz', (req: express.Request, res: express.Response) => { res.end(); });
         app.get('/status', (req: express.Request, res: express.Response) => { this.showInfos(req.query.env, res); });
     }
@@ -118,17 +118,17 @@ export class Server {
             return;
 
         if (rule.tlsDomain && rule.tlsDomain.startsWith("*."))
-            throw new Error(`Rule ${rule.id} wildcard domain is not allowed into a rule.`);
+            throw new Error(`Rule ${rule.id} wildcard domain is not allowed into a rule`);
 
         if (rule.tlsDomain && !this.currentDefinition.tlsEmail)
             throw new Error("tlsEmail is required for let's encrypt certificate creation");
 
-        if (!rule.hostName && rule.tlsDomain) {
-            rule.hostName = rule.tlsDomain;
+        if (!rule.hostname && rule.tlsDomain) {
+            rule.hostname = rule.tlsDomain;
         }
 
-        if (!rule.hostName && !rule.path) {
-            throw new Error(`Rule ${rule.id} either hostName or path must be set`);
+        if (!rule.hostname && !rule.path) {
+            throw new Error(`Rule ${rule.id} either hostname or path must be set`);
         }
 
         if (!rule.serviceName) {

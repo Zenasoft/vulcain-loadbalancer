@@ -1,11 +1,24 @@
+FROM node:9-alpine as build
+
+WORKDIR /app
+
+COPY package.json package-lock.json tsconfig.json /app/
+RUN npm install
+
+COPY src/ /app/src/
+RUN npm run build
+
+# ---------------------------
 FROM haproxy:1.7
 
 RUN echo deb http://ftp.debian.org/debian jessie-backports main >> /etc/apt/sources.list && \
     apt-get update && apt-get upgrade -y && apt-get -y install curl && \
-    curl -fsSL https://deb.nodesource.com/setup_6.x | sh && \
+    curl -fsSL https://deb.nodesource.com/setup_8.x | bash && \
     apt-get -y install nodejs supervisor cron && apt-get clean
 
 RUN curl https://dl.eff.org/certbot-auto -O && chmod a+x certbot-auto && mv certbot-auto /usr/bin/certbot && certbot --install-only -n
+
+ENV NODE_ENV=production
 
 EXPOSE 1936
 EXPOSE 29000
@@ -20,6 +33,9 @@ RUN mkdir -p /var/log/supervisor /app/letsencrypt/.well-known/acme-challenge
 # Application
 WORKDIR /app
 
+COPY package.json package-lock.json tsconfig.json /app/
+RUN npm install
+
 COPY assets/supervisord.conf /etc/supervisord.conf
 
 # cron job for renewal (useless since cerbot provides this functionality)
@@ -31,7 +47,6 @@ COPY assets/cert-creation.sh /app/cert-creation.sh
 RUN chmod +x /app/cert-creation.sh
 
 COPY assets/global.default assets/test.default /var/haproxy/
-COPY node_modules/ /app/node_modules
-COPY dist/ /app
+COPY --from=build /app/dist/ /app/
 
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

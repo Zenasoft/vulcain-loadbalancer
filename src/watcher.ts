@@ -100,26 +100,23 @@ export class KubernetesWatcher implements IWatcher {
     }
 
     private mapFromAnnotations(obj): IngressDefinition {
-        let rule: any = {};
+        let rule: RuleDefinition = { id: obj.metadata.uid, serviceName: obj.metadata.name + "." + obj.metadata.namespace};
         let annotations = obj.metadata.annotations;
         if (!annotations)
             return null;
 
         // Required
-        rule.hostName = annotations["ingress.vulcain.io/hostname"];
+        rule.hostname = annotations["ingress.vulcain.io/hostname"];
         rule.tlsDomain = annotations["ingress.vulcain.io/tlsDomain"];
         rule.path = annotations["ingress.vulcain.io/path"];
 
-        if (!rule.path && !(rule.hostName || rule.tlsDomain))
+        if (!rule.path && !(rule.hostname || rule.tlsDomain))
             return null;
 
         // Optional
         rule.servicePort = annotations["ingress.vulcain.io/port"];
         rule.pathRewrite = annotations["ingress.vulcain.io/pathRewrite"];
         rule.tenant = annotations["ingress.vulcain.io/tenant"];
-
-        rule.serviceName = obj.metadata.name + "." + obj.metadata.namespace;
-        rule.id = obj.metadata.uid;
 
         return {
             tlsEmail: annotations["ingress.vulcain.io/tlsEmail"],

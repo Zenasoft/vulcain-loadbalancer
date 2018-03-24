@@ -24,6 +24,7 @@ import * as Path from 'path';
 export class ProxyManager {
     private restarting = false;
     private firstTime: boolean = true;
+
     constructor(public engine: IEngine) {
     }
 
@@ -53,6 +54,7 @@ export class ProxyManager {
         var args = ["-f " + Path.join(folder, defaultName + ".default")];
         try {
             var files = fs.readdirSync(folder);
+            // Take all .cfg files
             files.forEach(function (file: string, index) {
                 if (!file.endsWith(".cfg")) {
                     return;
@@ -96,13 +98,15 @@ export class ProxyManager {
     }
 
     purge(def: IngressDefinition) {
-        if (!def || !def.rules)
+        if (!def || !def.rules) {
             return;
+        }
 
         fs.exists(this.engine.certificatesFolder, exists => {
             if (!exists) {
                 return;
             }
+
             fs.readdir(this.engine.certificatesFolder, (err, folders) => {
                 if (err) {
                     util.log("Error when trying to purge certificates " + err);
@@ -111,8 +115,8 @@ export class ProxyManager {
 
                 let activeDomains =
                     def.rules.filter(d => d.tlsDomain).map(d => d.tlsDomain)
-                    // Do not revoke a wildcard domain
-                    .concat(def.wildcardDomains);
+                        // Do not revoke a wildcard domain
+                        .concat(def.wildcardDomains);
 
                 for (let folder of folders) {
                     if (activeDomains.find(d => d === folder)) {

@@ -30,15 +30,36 @@ docker service create --name load-balancer -p 80:80 -p 443:443 -p 29000:29000 \
 
 ## API
 
-POST: host:29000/update : update configurations
+POST: host:29000/update : update rules
+POST: host:29000/delete : update rules
 data: see [ServiceDefinitions](src/model.ts)
 
+example:
+{
+    "tlsEmail": "letsencrypt mail",
+    rules: [
+        {
+            "tlsDomain": "a.mydomain.com",
+            "hostname": "a.mydomain.com", // Optional if equals to tlsDomain
+            "path": "/api/", // Filter by path (optional)
+            "serviceName": "service.namespace"
+        }
+    ]
+}
 GET: host:29000/restart : Restart haproxy
-
-GET: host:29000/health : Health endpoint
 
 GET: host:29000/status : Show current configuration
 
 ## Server API
 
 GET /api/service.config?env=
+
+## Kubernetes
+
+livenessProbe : GET http://localhost:8888/healthz
+
+### Using annotations for registering service automatically
+
+annotations:
+  "ingress.vulcain.io/tlsDomain": "a.mydomain.com",
+  "ingress.vulcain.io/tlsEmail": "letsencrypt mail",

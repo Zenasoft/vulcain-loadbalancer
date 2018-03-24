@@ -4,18 +4,20 @@
   "description": "Vulcain load balancer",
   "main": "src/index.ts",
   "private": true,
-  "scripts": {},
+  "scripts": {
+    "build": "tsc -p ."
+  },
   "author": "Alain Metge",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/node": "^8.0.31",
-    "typescript": "^2.5.3"
+    "@types/node": "^9.6.0",
+    "typescript": "^2.7.2"
   },
   "dependencies": {
     "@kubernetes/client-node": "^0.2.0",
     "body-parser": "^1.15.2",
-    "express": "^4.14.0",
-    "shelljs": "^0.7.5",
+    "express": "^4.16.3",
+    "shelljs": "^0.8.1",
     "yamljs": "^0.3.0"
   }
 }

@@ -7,7 +7,7 @@
 			"request": "launch",
 			"program": "${workspaceRoot}/src/index.ts",
 			"stopOnEntry": false,
-			"smartStep": true,
+			"smartStep": false,
 			"preLaunchTask": "build",
 			"args": [],
 			"cwd": "${workspaceRoot}",
