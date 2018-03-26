@@ -14,9 +14,9 @@ FROM haproxy:1.7
 RUN echo deb http://ftp.debian.org/debian jessie-backports main >> /etc/apt/sources.list && \
     apt-get update && apt-get upgrade -y && apt-get -y install curl && \
     curl -fsSL https://deb.nodesource.com/setup_8.x | bash && \
-    apt-get -y install nodejs supervisor cron && apt-get clean
-
-RUN curl https://dl.eff.org/certbot-auto -O && chmod a+x certbot-auto && mv certbot-auto /usr/bin/certbot && certbot --install-only -n
+    apt-get -y install nodejs supervisor cron && \
+    curl https://dl.eff.org/certbot-auto -O && chmod a+x certbot-auto && mv certbot-auto /usr/bin/certbot && certbot --install-only -n && \
+    apt-get clean && rm -rf rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 

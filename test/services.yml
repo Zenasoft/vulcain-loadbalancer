@@ -1,7 +1,6 @@
 # Sample for initial configuration
 
 # Optional fields
-env: test
 defaultTenantPattern: (/w*)\.mydomain.com # default. Used to set x-vulcain-tenant header
 tlsEmail: admin@mydomain.com # (optional). Domain administrator email
 wildcardDomains: ["mydomain.com"]

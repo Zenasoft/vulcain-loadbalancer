@@ -146,10 +146,7 @@ export class Server {
     }
 
     private validateWildcardDomains(def: IngressDefinition) {
-        if (!def.wildcardDomains)
-            def.wildcardDomains = [];
-        else
-            def.wildcardDomains = def.wildcardDomains.map(wd => (wd.startsWith("*.") ? wd.substr(2) : wd).toLowerCase());
+        return def.wildcardDomains && def.wildcardDomains.map(wd => (wd.startsWith("*.") ? wd.substr(2) : wd).toLowerCase());
     }
 
     async initializeProxyFromConfiguration(def: IngressDefinition, removeRule = false) {
@@ -159,16 +156,18 @@ export class Server {
                 if (!removeRule) {
                     this.currentDefinition = def;
                     if (def) {
-                        this.validateWildcardDomains(def);
+                        def.wildcardDomains = this.validateWildcardDomains(def) || [];
                         def.rules && def.rules.forEach(r => this.validateRule(r, false));
                     }
                 }
             }
             else {
                 if (!this.currentDefinition)
-                    this.currentDefinition = <any>{};
+                    this.currentDefinition = <any>{wildcardDomains: []};
 
-                this.validateWildcardDomains(def);
+                let wd = this.validateWildcardDomains(def);
+                if (wd)
+                    this.currentDefinition.wildcardDomains = wd;
 
                 // Merge with current
                 Object.keys(def).forEach(key => {

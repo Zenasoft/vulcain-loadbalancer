@@ -56,12 +56,28 @@ class MockEngine implements IEngine {
         shell.mkdir("-p", this.configurationsFolder);
     }
 
+    private lock(semaphore: string) {
+        if (semaphore.startsWith("$$lock_"))
+            return true; // simulate a lock to ignore this sempahore (it's itself)
+        let lockFile = Path.join(this.certificatesFolder, "$$lock_" + semaphore);
+        shell.mkdir(lockFile);
+        return shell.error() == null;
+    }
+
+    private unlock(semaphore: string) {
+        let lockFile = Path.join(this.certificatesFolder, "$$lock_" + semaphore);
+        shell.rm("-rf", lockFile);
+    }
+
     get configurationsFolder() {
         return "./data/config"
     }
 
     revokeCertificate(email: string, letsEncryptFolder: string, domain: string) {
+        let semaphore = domain + "_revoke";
+        this.lock(semaphore);
         util.log("MOCK: Revoke certificate " + domain);
+        this.unlock(semaphore);
     }
 
     // -------------------------------------------------------------------
@@ -87,14 +103,14 @@ class HostEngine implements IEngine {
      * Use mkdir because it is an atomic operation on linux
      */
     private lock(semaphore: string) {
-        let lockFile = Path.join(this.certificatesFolder, "." + semaphore + "_lock");
+        let lockFile = Path.join(this.certificatesFolder, semaphore + "__lock");
         shell.mkdir(lockFile);
         return shell.error() == null;
     }
 
     private unlock(semaphore: string) {
-        let lockFile = Path.join(this.certificatesFolder, "." + semaphore + "_lock");
-        shell.rmd("-f", lockFile);
+        let lockFile = Path.join(this.certificatesFolder, semaphore + "__lock");
+        shell.rm("-f", lockFile);
     }
 
     revokeCertificate(email: string, letsEncryptFolder: string, domain: string) {

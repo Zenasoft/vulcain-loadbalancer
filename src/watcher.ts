@@ -6,11 +6,11 @@ import fs = require('fs');
 const path = require('path');
 
 export interface IWatcher {
-    run(kc: k8s.KubeConfig);
+    run();
 }
 
 export class KubernetesWatcher implements IWatcher {
-    private constructor(private server: Server, private ignoredNamespaces: string[] = []) {
+    private constructor(private server: Server, private kc: k8s.KubeConfig, private ignoredNamespaces: string[] = []) {
         util.log("Initializing kubernetes watcher");
     }
 
@@ -31,8 +31,8 @@ export class KubernetesWatcher implements IWatcher {
             if (!kc)
                 return null;
 
-            let watcher = new KubernetesWatcher(server, ignoredNamespaces);
-            watcher.run(kc);
+            let watcher = new KubernetesWatcher(server, kc, ignoredNamespaces);
+            watcher.run();
             return watcher;
         }
         catch (e) {
@@ -62,10 +62,10 @@ export class KubernetesWatcher implements IWatcher {
         };
     }
 
-    run(kc: k8s.KubeConfig) {
-        let watch = new k8s.Watch(kc);
+    run() {
+        let watch = new k8s.Watch(this.kc);
         util.log("Listening on kubernetes events...");
-
+        let restart = this.run.bind(this);
         let req = watch.watch('/api/v1/watch/services',
             {},
             this.onServiceEvents.bind(this),
@@ -76,10 +76,13 @@ export class KubernetesWatcher implements IWatcher {
                 else {
                     util.log('Kubernetes watcher aborted.');
                 }
+                req = null;
+                watch = null;
+                restart();
             });
     }
 
-    private onServiceEvents(type: string, obj: any) {
+    private async onServiceEvents(type: string, obj: any) {
         if (type !== 'ADDED' && type !== 'MODIFIED' && type !== "DELETED")
             return;
 
@@ -91,7 +94,7 @@ export class KubernetesWatcher implements IWatcher {
         if (def) {
             removeRule ? util.log("Removing rule from kubernetes event") : util.log("Updating rule from kubernetes event");
             try {
-                this.server.initializeProxyFromConfiguration(def, removeRule);
+                await this.server.initializeProxyFromConfiguration(def, removeRule);
             }
             catch (e) {
                 util.log("Service ignored due to invalid service annotations. " + e.message);
