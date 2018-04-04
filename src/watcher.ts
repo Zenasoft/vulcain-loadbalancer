@@ -16,7 +16,14 @@ export class KubernetesWatcher implements IWatcher {
         util.log("Initializing kubernetes watcher");
     }
 
-    static create(server: Server, ignoredNamespaces = ["kube-system"]): IWatcher {
+    static create(server: Server): IWatcher {
+
+        let ignoredNamespaces = ["kube-system"];
+        let tmp = process.env["IGNORE_NAMESPACES"];
+        if (tmp) {
+            ignoredNamespaces = tmp.split(',').map(n => n.trim());
+        }
+
         try {
             let kc: k8s.KubeConfig;
             let configFile = process.env["KUBERNETES_CONFIG_FILE"];

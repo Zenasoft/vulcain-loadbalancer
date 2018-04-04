@@ -159,10 +159,10 @@ class HostEngine implements IEngine {
                     resolve(true);
                 }
                 else {
-                    util.log("***** Error ***** " + message);
+                    util.log("***** Error ***** " + message + " - " + error.message);
                     stdout && util.log(" stdout : " + stdout);
                     stderr && util.log(" stderr : " + stderr);
-                    reject(error);
+                    resolve(false);
                 }
             });
         });
