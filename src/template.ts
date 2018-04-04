@@ -238,6 +238,14 @@ export class Template {
             }
         }
 
+        if (rule.backendConfig) {
+            let parts = rule.backendConfig.split(';').map(p => p && p.trim());
+            parts.forEach(p => {
+                if (p) {
+                    this.backends.push(p);
+                }
+            });
+        }
         this.backends.push("  server " + serviceName + " " + rule.serviceName + ":" + (rule.servicePort || "8080"));
     }
 

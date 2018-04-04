@@ -10,6 +10,8 @@ export interface IWatcher {
 }
 
 export class KubernetesWatcher implements IWatcher {
+    private _restartCount = 0;
+
     private constructor(private server: Server, private kc: k8s.KubeConfig, private ignoredNamespaces: string[] = []) {
         util.log("Initializing kubernetes watcher");
     }
@@ -51,6 +53,8 @@ export class KubernetesWatcher implements IWatcher {
         let caCert = fs.readFileSync(k8s.Config.SERVICEACCOUNT_CA_PATH);
         let token = fs.readFileSync(k8s.Config.SERVICEACCOUNT_TOKEN_PATH);
 
+        util.log(`Kubernetes config loaded from cluster configuration`);
+
         return <any>{
             getCurrentCluster() {
                 return { server: 'https://' + host + ':' + port };
@@ -78,11 +82,14 @@ export class KubernetesWatcher implements IWatcher {
                 }
                 req = null;
                 watch = null;
-                restart();
+
+                if((this._restartCount++) < 10)
+                    setTimeout(restart, 1000);
             });
     }
 
     private async onServiceEvents(type: string, obj: any) {
+        this._restartCount = 0;
         if (type !== 'ADDED' && type !== 'MODIFIED' && type !== "DELETED")
             return;
 
@@ -120,6 +127,7 @@ export class KubernetesWatcher implements IWatcher {
         rule.servicePort = annotations["ingress.vulcain.io/port"];
         rule.pathRewrite = annotations["ingress.vulcain.io/pathRewrite"];
         rule.tenant = annotations["ingress.vulcain.io/tenant"];
+        rule.backendConfig = annotations["ingress.vulcain.io/backendConfigs"];
 
         return {
             tlsEmail: annotations["ingress.vulcain.io/tlsEmail"],

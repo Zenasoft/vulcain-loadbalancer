@@ -45,6 +45,10 @@ export interface RuleDefinition {
      * Exposed port service - Default to 8080
      */
     servicePort?: number;
+    /**
+     * Haproxy custom backend config list delimited by ;
+     */
+    backendConfig?: string;
 }
 
 /**
