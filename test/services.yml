@@ -18,7 +18,7 @@ rules:
     serviceName: hopex-admin-10
     servicePort: 8080
     tenant: vulcain
-    path: /public/ # optional - Filter only request where path begins with /public ignore all others
+    path: /public/ # optional - Filter only request where path begins with /public ignore all others (can be mixed with hostname)
     pathRewrite: /api/ # optional - replace path with it
   - hostname: admin.mydomain.com
     id: "3"
