@@ -90,8 +90,10 @@ export class KubernetesWatcher implements IWatcher {
                 req = null;
                 watch = null;
 
-                if((this._restartCount++) < 10)
+                if ((this._restartCount++) < 10)
                     setTimeout(restart, 1000);
+                else
+                    process.exit(1);
             });
     }
 
