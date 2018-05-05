@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Obsolete file
+
 echo "---- Running renew script $(date) ----"
 
 # renew and set a flag (as a file) if a renew has occured

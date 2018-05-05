@@ -39,7 +39,7 @@ RUN npm install
 COPY assets/supervisord.conf /etc/supervisord.conf
 
 # cron job for renewal (useless since cerbot provides this functionality)
-#RUN echo "0 0 * * 0 /app/cert-renewal.sh >> /var/log/renew.log 2>&1" | crontab -
+RUN echo "0 0 * * 0 /usr/bin/certbot renew --quiet --no-self-upgrade" | crontab -
 #COPY assets/cert-renewal.sh /app/cert-renewal.sh
 #RUN chmod +x /app/cert-renewal.sh
 

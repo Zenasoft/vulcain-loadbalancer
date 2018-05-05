@@ -103,14 +103,15 @@ class HostEngine implements IEngine {
      * Use mkdir because it is an atomic operation on linux
      */
     private lock(semaphore: string) {
-        let lockFile = Path.join(this.certificatesFolder, semaphore + "__lock");
-        shell.mkdir(lockFile);
-        return shell.error() == null;
+        // let lockFile = Path.join(this.certificatesFolder, semaphore + "__lock");
+        // shell.mkdir(lockFile);
+        // return shell.error() == null;
+        return true; // see https://certbot.eff.org/docs/using.html#id6
     }
 
     private unlock(semaphore: string) {
-        let lockFile = Path.join(this.certificatesFolder, semaphore + "__lock");
-        shell.rm("-f", lockFile);
+        // let lockFile = Path.join(this.certificatesFolder, semaphore + "__lock");
+        // shell.rm("-f", lockFile);
     }
 
     revokeCertificate(email: string, letsEncryptFolder: string, domain: string) {
