@@ -118,7 +118,7 @@ export class Template {
                         }
                     }
                     catch (e) {
-                        util.log("Creating certificate for domain " + domainName + " failed. " + e.message);
+                        util.log("Certificate creation for domain " + domainName + " failed. " + e.message);
                     }
                 }
             }

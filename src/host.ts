@@ -137,14 +137,14 @@ class HostEngine implements IEngine {
                             util.log(`Certificate deletion failed for domain ${domain}`);
                         }
                         this.unlock(semaphore);
-                        resolve();
+                        resolve(true);
                     });
                 }
                 else {
                     util.log(`Certificate revocation failed for domain ${domain}`);
                     console.log(stderr);
                     this.unlock(semaphore);
-                    resolve();
+                    resolve(false);
                 }
             });
         });

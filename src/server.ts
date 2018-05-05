@@ -282,73 +282,7 @@ export class Server {
             }
         }
 
-        let vulcainAddress = process.env.VULCAIN_SERVER;
-        if (!vulcainAddress) {
-            return Promise.resolve({ def: services });
-        }
-
-        return this.getConfigurationFromVulcainServer(vulcainAddress, services);
-    }
-
-    private getConfigurationFromVulcainServer(vulcainAddress: string, services: any) {
-
-        let env = process.env.VULCAIN_ENV;
-        let token = process.env.VULCAIN_TOKEN;
-        if (!token) {
-            util.log("ERROR: Token is required for getting configuration from vulcain server.");
-            process.exit(1);
-        }
-
-        util.log(`Getting proxy configuration for environment ${env} on ${vulcainAddress}`);
-
-        // Getting information from vulcain server for initialize config
-        let parts = vulcainAddress.split(':');
-        let opts: http.RequestOptions = {
-            method: "get",
-            path: "/api/service.config?env=" + env,
-            host: parts[0],
-            port: parts.length > 1 ? parseInt(parts[1]) : 80,
-            headers: {
-                "Authorization": "ApiKey " + token
-            }
-        };
-
-        return new Promise((resolve, reject) => {
-            let req = http.request(opts, (res) => {
-                let data: any = '';
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-                res.on('end', () => {
-                    let error;
-                    let def = {};
-                    let status = res.statusCode;
-                    if (status / 100 > 2) {
-                        error = data;
-                    }
-                    else {
-                        try {
-                            let response = JSON.parse(data);
-                            if (response.error) {
-                                error = response.error.message;
-                            }
-                            else {
-                                def = response.value;
-                            }
-                        }
-                        catch (e) {
-                            error = e.message;
-                        }
-                    }
-
-                    resolve({ error, def: Object.assign(services, def) });
-                });
-            });
-            req.on('error', (e) => {
-                resolve({ error: e });
-            });
-            req.end();
-        });
+        return Promise.resolve({ def: services });
     }
 
     private async showInfos(env: string, res: express.Response) {

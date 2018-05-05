@@ -1,0 +1,98 @@
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: vulcain-ingress
+  labels:
+    name: vulcain-ingress
+  namespace: kube-system
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: vulcain-ingress
+    spec:
+      serviceAccountName: vulcain-ingress
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      containers:
+      - name: vulcain-ingress
+        image: vulcain/load-balancer:latest
+        ports:
+        - containerPort: 29000
+          protocol: TCP
+        - containerPort: 443
+          protocol: TCP
+        - containerPort: 80
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vulcain-ingress-public
+  labels:
+    name: vulcain-ingress-public
+  namespace: kube-system
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  - port: 443
+    targetPort: 443
+    name: https
+  selector:
+    name: vulcain-ingress
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vulcain-ingress-private
+  labels:
+    name: vulcain-ingress-private
+  namespace: kube-system
+spec:
+  ports:
+  - port: 29000
+    targetPort: 29000
+    name: http
+  selector:
+    name: vulcain-ingress
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: vulcain-ingress
+  namespace: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: vulcain-ingress
+  namespace: kube-system
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: vulcain-ingress
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vulcain-ingress
+subjects:
+- kind: ServiceAccount
+  name: vulcain-ingress
+  namespace: kube-system
